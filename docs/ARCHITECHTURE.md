@@ -9,7 +9,7 @@ Absolutely. Below is a **complete `docs/ARCHITECTURE.md`** you can paste directl
 **Frontend:** React + TypeScript  
 **Backend:** Java Spring Boot  
 **Database:** PostgreSQL  
-**Maps:** OpenStreetMap  
+**Maps:** OpenStreetMap   
 **Deployment:** Vercel + Render/Railway + Neon PostgreSQL  
 **Version:** 1.0
 

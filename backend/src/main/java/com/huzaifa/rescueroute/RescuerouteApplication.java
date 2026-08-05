@@ -9,5 +9,5 @@ public class RescuerouteApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(RescuerouteApplication.class, args);
 	}
-
+	
 }
