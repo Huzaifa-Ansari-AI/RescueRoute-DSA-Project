@@ -1,306 +1,281 @@
 # Deployment Guide
 
-**Project:** RescueRoute  
-**Version:** 1.0
+## Purpose
+This document defines how RescueRoute will be deployed from local development to a publicly accessible production application.
+
+The deployment process should be simple, repeatable, and easy to maintain.
 
 ---
 
-# 1. Purpose
+# Deployment Architecture
 
-This document defines the deployment strategy for RescueRoute.
-
-The application will use a modern cloud architecture with separate deployments for the frontend, backend, and database.
-
----
-
-# 2. Technology Stack
-
-| Component | Technology |
-|-----------|------------|
-| Frontend | React + TypeScript + Vite |
-| Backend | Java 21 + Spring Boot |
-| Database | PostgreSQL (Neon) |
-| Maps | OpenStreetMap + Leaflet |
-| Frontend Hosting | Vercel |
-| Backend Hosting | Render or Railway |
-| Version Control | GitHub |
-
----
-
-# 3. Deployment Architecture
-
-```
-                 Users
-                   │
-                   ▼
-         React Frontend (Vercel)
-                   │
-             REST API (HTTPS)
-                   │
-                   ▼
-      Spring Boot Backend
-        (Render / Railway)
-                   │
-             PostgreSQL
-          (Neon Database)
+```text
+React (Vercel)
+        │
+        │ HTTPS
+        ▼
+Spring Boot API (Render)
+        │
+        ▼
+PostgreSQL (Neon)
 ```
 
 ---
 
-# 4. Environment Variables
+# Hosting Services
 
-Never hardcode secrets.
-
-Store sensitive values using environment variables.
-
-### Frontend
-
-```
-VITE_API_BASE_URL=
-```
-
-### Backend
-
-```
-DATABASE_URL=
-DATABASE_USERNAME=
-DATABASE_PASSWORD=
-JWT_SECRET=
-JWT_EXPIRATION=
-CORS_ALLOWED_ORIGINS=
-```
-
-Never commit `.env` files to GitHub.
-
----
-
-# 5. Frontend Deployment
-
+## Frontend
 Platform:
-
 - Vercel
 
-Requirements:
-
-- Production build succeeds
-- API URL configured
-- Environment variables added
-- Routing configured
-- HTTPS enabled
+Responsibilities:
+- Build React application
+- Serve static assets
+- Connect to backend API
 
 ---
 
-# 6. Backend Deployment
+## Backend
 
 Platform:
+- Render
 
-- Render (preferred)
-- Railway (alternative)
-
-Requirements:
-
-- Java 21
-- Maven build
-- Environment variables configured
-- Database connected
-- HTTPS enabled
+Responsibilities:
+- Run Spring Boot application
+- Expose REST APIs
+- Connect to PostgreSQL
 
 ---
 
-# 7. Database Deployment
+## Database
 
 Platform:
-
 - Neon PostgreSQL
 
-Requirements:
-
-- Create production database
-- Configure credentials
-- Enable SSL
-- Restrict database access
-- Schedule backups
+Responsibilities:
+- Store application data
+- Provide managed backups
+- Scale independently
 
 ---
 
-# 8. Build Process
+# Environment Variables
 
-Frontend
+## Frontend
 
-```
-Install Dependencies
-↓
+Required variables:
 
-Run Linter
-↓
-
-Build Project
-↓
-
-Deploy to Vercel
+```text
+VITE_API_BASE_URL
 ```
 
-Backend
+Example:
 
-```
-Compile
-↓
-
-Run Tests
-↓
-
-Package JAR
-↓
-
-Deploy to Render/Railway
+```text
+VITE_API_BASE_URL=https://api.rescueroute.com/api/v1
 ```
 
 ---
 
-# 9. Deployment Workflow
+## Backend
 
-1. Push code to GitHub.
-2. Verify tests pass.
-3. Build frontend.
-4. Build backend.
-5. Deploy backend.
-6. Deploy frontend.
-7. Verify database connection.
-8. Perform smoke testing.
-9. Monitor logs.
-10. Release.
+Required variables:
 
----
+```text
+DATABASE_URL
+DATABASE_USERNAME
+DATABASE_PASSWORD
+JWT_SECRET
+SERVER_PORT
+SPRING_PROFILES_ACTIVE
+```
 
-# 10. Post-Deployment Checklist
-
-Verify:
-
-- Frontend loads correctly.
-- Backend is reachable.
-- Database connection works.
-- Authentication works.
-- Search works.
-- Maps load correctly.
-- Routing functions properly.
-- Protected APIs require authentication.
-- HTTPS is enabled.
+Never commit these values to Git.
 
 ---
 
-# 11. Monitoring
+# Build Process
 
-Monitor:
+## Frontend
 
+```bash
+npm install
+npm run build
+```
+
+Output:
+
+```text
+dist/
+```
+
+---
+
+## Backend
+
+```bash
+mvn clean package
+```
+
+Output:
+
+```text
+target/*.jar
+```
+
+---
+
+# Deployment Flow
+
+## Step 1
+
+Push code to GitHub.
+
+↓
+
+## Step 2
+
+Vercel automatically builds the frontend.
+
+↓
+
+## Step 3
+
+Render automatically builds the backend.
+
+↓
+
+## Step 4
+
+Backend connects to Neon PostgreSQL.
+
+↓
+
+## Step 5
+
+Verify application health.
+
+↓
+
+## Step 6
+
+Release to production.
+
+---
+
+# Pre-Deployment Checklist
+
+Before every deployment:
+
+- Project builds successfully
+- No compilation errors
+- No TypeScript errors
+- No failing API endpoints
+- Database connection verified
+- Environment variables configured
+- Responsive UI checked
+- Console free of major errors
+
+---
+
+# Post-Deployment Checklist
+
+After deployment verify:
+
+- Frontend loads
+- Backend responds
+- Database connection works
+- Map loads correctly
+- Facility markers appear
+- Search works
+- Filters work
+- APIs return expected responses
+
+---
+
+# Versioning
+
+Use Semantic Versioning.
+
+Examples:
+
+```text
+v1.0.0
+v1.1.0
+v1.2.0
+```
+
+- Major → breaking changes
+- Minor → new features
+- Patch → bug fixes
+
+---
+
+# Release Workflow
+
+1. Develop feature
+2. Test locally
+3. Commit changes
+4. Push to GitHub
+5. Automatic deployment
+6. Verify production
+7. Create release tag
+
+---
+
+# Rollback Strategy
+
+If a deployment fails:
+
+- Roll back to the previous stable release.
+- Restore the last working environment variables if needed.
+- Verify database integrity.
+- Fix the issue locally before redeploying.
+
+---
+
+# Monitoring
+
+After deployment monitor:
+
+- Backend availability
+- API response time
+- Database connectivity
 - Application logs
-- API errors
-- Database performance
-- Response times
-- Deployment status
-- Server uptime
+- Build status
+- Runtime errors
 
 ---
 
-# 12. Backup Strategy
-
-- Regular database backups
-- Keep deployment history
-- Tag stable releases in Git
-- Store configuration securely
-
----
-
-# 13. Rollback Strategy
-
-If deployment fails:
-
-1. Roll back to the last stable version.
-2. Restore database if required.
-3. Investigate logs.
-4. Fix the issue.
-5. Redeploy.
-
----
-
-# 14. Security During Deployment
-
-- Use HTTPS only.
-- Store secrets securely.
-- Never expose API keys.
-- Restrict CORS.
-- Disable debug mode in production.
-- Validate environment variables before deployment.
-
----
-
-# 15. CI/CD (Future Enhancement)
+# Future Improvements
 
 Future versions may include:
 
-- GitHub Actions
-- Automated testing
-- Automated builds
-- Automated deployments
-- Security scanning
-- Dependency updates
+- Custom domain
+- HTTPS certificate management
+- Docker deployment
+- CI/CD with GitHub Actions
+- Automated testing before deployment
+- Performance monitoring
+- Error tracking
+- Database migrations
 
 ---
 
-# 16. Definition of Successful Deployment
+# Definition of Successful Deployment
 
-A deployment is considered successful when:
+A deployment is successful when:
 
-- Frontend is accessible.
-- Backend APIs respond correctly.
-- Database is connected.
-- Authentication works.
-- Maps and routing function correctly.
+- Frontend is publicly accessible.
+- Backend APIs are reachable.
+- Database operations succeed.
+- Core user workflows function correctly.
 - No critical errors appear in logs.
-- Performance is acceptable.
-- All production environment variables are configured.
 
 ---
 
-# 17. Production Readiness Checklist
+# Final Rule
 
-Before every release, verify:
+Deploy only stable, tested code.
 
-- Code reviewed
-- Tests passed
-- Documentation updated
-- Environment variables configured
-- Database migrated
-- HTTPS enabled
-- Security checks completed
-- Backup available
-- Monitoring active
-- Rollback plan prepared
-
----
-
-# 18. Future Improvements
-
-Future deployments may include:
-
-- Docker containers
-- Kubernetes
-- Nginx reverse proxy
-- Redis caching
-- CDN integration
-- Multi-region deployment
-- Blue-Green deployments
-- Automated CI/CD pipelines
-
----
-
-# 19. Deployment Philosophy
-
-Every deployment should be:
-
-- Secure
-- Repeatable
-- Automated where possible
-- Easy to roll back
-- Well documented
-- Minimal downtime
-- Production-ready
+Every deployment should leave the application in a fully working state.

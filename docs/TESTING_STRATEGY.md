@@ -1,264 +1,171 @@
-# Testing Strategy
+# RescueRoute Testing Strategy
 
-**Project:** RescueRoute  
-**Version:** 1.0
-
----
-
-# 1. Purpose
-
-This document defines the testing strategy for RescueRoute to ensure reliability, correctness, and maintainability.
-
-Testing should be performed throughout development, not only before deployment.
+## Purpose
+This document defines how RescueRoute should be tested so features work correctly, remain stable, and can be safely improved over time.
 
 ---
 
-# 2. Testing Principles
-
-- Test every feature before merging.
-- Fix bugs before adding new features.
-- Automate testing where possible.
-- Write reproducible tests.
-- Keep tests simple and maintainable.
-
----
-
-# 3. Testing Levels
-
-The project should include:
-
-- Unit Testing
-- Integration Testing
-- API Testing
-- Frontend Testing
-- End-to-End (E2E) Testing
-- Manual Testing
+## Testing Goals
+- Catch issues early
+- Verify each feature before moving forward
+- Keep the app stable while building quickly
+- Make sure frontend and backend work together correctly
+- Prevent broken changes from reaching the main branch
 
 ---
 
-# 4. Backend Testing
+## Testing Levels
 
-Test all backend components:
+### 1. Manual Testing
+Used for:
+- map behavior
+- search and filter behavior
+- marker clicks
+- popup details
+- form interactions
+- responsive layout checks
 
-- Controllers
-- Services
-- Repositories
-- Security
-- Validation
-- Exception Handling
-
-Verify:
-
-- Business logic
-- Database operations
-- Authentication
-- Authorization
+### 2. Backend Testing
+Used for:
 - API responses
+- validation
+- error handling
+- authentication
+- facility CRUD
+- route calculation
+
+### 3. Frontend Testing
+Used for:
+- page rendering
+- component behavior
+- search input
+- category filters
+- loading states
+- empty states
+- mobile layout
+
+### 4. Integration Testing
+Used for:
+- frontend calling backend
+- backend returning facility data
+- marker updates from API data
+- auth and protected endpoints later
 
 ---
 
-# 5. Frontend Testing
+## What Must Be Tested
 
-Test all UI features:
+### Map Module
+- OpenStreetMap loads correctly
+- Karachi center is correct
+- Zoom and drag work
+- Markers appear in the right locations
+- Each marker opens the correct popup
+- Marker icons match the facility type
 
-- Navigation
-- Forms
-- Validation
-- Search
-- Maps
-- Route display
-- Dashboard
-- Error messages
-- Loading states
+### Search Module
+- Search by facility name
+- Search results update immediately
+- Category filter works
+- Combined search and filter works
+- Empty results are handled clearly
 
-Ensure the UI works correctly on:
+### Backend API
+- Health endpoint returns success
+- Response format is consistent
+- Validation errors return clean messages
+- Not found errors return the correct status
+- Unexpected errors are handled globally
 
-- Desktop
-- Tablet
-- Mobile
+### Facility Data
+- Facility names display correctly
+- Facility types are correct
+- Latitude and longitude values are valid
+- Address and details are shown correctly
+
+### UI/UX
+- Home page renders without errors
+- Search bar is usable
+- Filter dropdown works
+- Cards and map remain readable
+- Layout is usable on smaller screens
 
 ---
 
-# 6. API Testing
+## Test Priorities
+Test in this order:
 
-Every API should be tested for:
+1. Critical user flow
+2. Map rendering
+3. Search and filtering
+4. Popup details
+5. API response correctness
+6. Error handling
+7. Responsive design
 
-- Success responses
-- Invalid input
-- Unauthorized access
-- Forbidden access
-- Resource not found
-- Validation errors
-- Server errors
+---
+
+## Frontend Testing Approach
+For now, use practical testing:
+- open the app in the browser
+- verify visible behavior
+- check console for errors
+- test with sample data
+- confirm UI updates after search/filter changes
+
+Later, automated frontend tests can be added.
+
+---
+
+## Backend Testing Approach
+Test backend endpoints with:
+- browser
+- Postman
+- curl
+- API client in the frontend
 
 Verify:
-
-- HTTP status codes
-- JSON response format
-- Response time
-- Error handling
-
----
-
-# 7. Authentication Testing
-
-Verify:
-
-- User registration
-- Login
-- JWT generation
-- Token validation
-- Token expiration
-- Logout (if implemented)
-- Protected routes
-- Role-based access
+- request body
+- response body
+- HTTP status code
+- validation output
+- exception handling
 
 ---
 
-# 8. Database Testing
-
-Verify:
-
-- CRUD operations
-- Foreign key constraints
-- Data validation
-- Index usage
-- Transactions
-- Data consistency
-
----
-
-# 9. Search & Routing Testing
-
-Test:
-
-- Facility search
-- Filters
-- Distance calculations
-- Route generation
-- Map markers
-- Travel time estimation
-
-Use different locations and edge cases.
+## Smoke Test Checklist
+Before every major change, confirm:
+- frontend starts successfully
+- backend starts successfully
+- map loads
+- markers appear
+- popup opens
+- search works
+- filter works
+- backend health endpoint responds
 
 ---
 
-# 10. UI Testing Checklist
-
-Verify every page has:
-
-- Responsive layout
-- Correct navigation
-- Functional buttons
-- Form validation
-- Clear error messages
-- Loading indicators
-- Consistent styling
+## Bug Handling
+When a bug is found:
+- reproduce it
+- isolate the file or endpoint
+- fix the smallest possible part
+- re-test immediately
+- do not move to the next feature until the bug is resolved
 
 ---
 
-# 11. Error Handling Tests
-
-Test:
-
-- Invalid requests
-- Missing fields
-- Invalid coordinates
-- Invalid IDs
-- Unauthorized users
-- Server failures
-
-Ensure user-friendly error messages are displayed.
+## Definition of Done
+A feature is complete only when:
+- it works in the browser
+- it works with the backend
+- it has no obvious UI issues
+- errors are handled properly
+- it does not break existing features
 
 ---
 
-# 12. Performance Testing
-
-Verify:
-
-- Fast page loading
-- Efficient database queries
-- Optimized API responses
-- Smooth map interactions
-- Acceptable response times under normal load
-
----
-
-# 13. Security Testing
-
-Verify:
-
-- Password hashing
-- JWT protection
-- Authorization rules
-- Input validation
-- SQL Injection prevention
-- XSS protection
-- Secure API endpoints
-
----
-
-# 14. Regression Testing
-
-Whenever a feature is modified:
-
-- Re-test related functionality.
-- Ensure existing features continue to work.
-- Fix regressions before merging.
-
----
-
-# 15. Bug Reporting
-
-Each bug report should include:
-
-- Title
-- Description
-- Steps to reproduce
-- Expected result
-- Actual result
-- Severity
-- Screenshots (if applicable)
-
----
-
-# 16. Definition of Done
-
-A feature is complete only if:
-
-- It functions correctly.
-- It passes all relevant tests.
-- No critical bugs remain.
-- API responses are correct.
-- UI behaves as expected.
-- Documentation is updated.
-- Code follows project standards.
-
----
-
-# 17. Testing Checklist
-
-Before every release:
-
-- All APIs tested
-- Authentication verified
-- Authorization verified
-- Database operations verified
-- Search verified
-- Routing verified
-- UI tested on multiple screen sizes
-- Error handling verified
-- Security checks completed
-- No critical or high-severity bugs remain
-
----
-
-# 18. Continuous Improvement
-
-Testing should evolve with the project.
-
-Whenever a new feature is added:
-
-- Add corresponding test cases.
-- Update this document if the testing strategy changes.
-- Ensure existing functionality remains unaffected.
+## Final Rule
+Testing should happen continuously.
+Do not wait until the end of the project to test everything.

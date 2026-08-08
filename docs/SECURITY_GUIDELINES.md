@@ -1,231 +1,120 @@
-# Security Guidelines
+# RescueRoute Security Guidelines
 
-**Project:** RescueRoute  
-**Version:** 1.0
-
----
-
-# 1. Security Principles
-
-RescueRoute handles sensitive medical-related information. Security must be considered throughout development.
-
-Follow these principles:
-
-- Secure by default
-- Least privilege access
-- Defense in depth
-- Never trust user input
-- Protect sensitive data
-- Fail securely
+## Purpose
+These guidelines define how RescueRoute should protect user data, API access, and administrative actions.
 
 ---
 
-# 2. Authentication
-
-- Use JWT Authentication.
-- Hash passwords using BCrypt.
-- Never store plain-text passwords.
-- Set token expiration.
-- Validate JWT on every protected request.
-
----
-
-# 3. Authorization
-
-Use Role-Based Access Control (RBAC).
-
-Supported roles:
-
-- USER
-- PROVIDER
-- ADMIN
-
-Only allow users to access resources they are authorized to use.
+## Security Goals
+- Protect user accounts
+- Prevent unauthorized data changes
+- Keep sensitive information out of the frontend
+- Secure all backend endpoints
+- Use safe defaults everywhere
 
 ---
 
-# 4. Password Policy
-
-Passwords must:
-
-- Be at least 8 characters long.
-- Contain uppercase and lowercase letters.
-- Contain at least one number.
-- Be hashed before storage.
-
-Never return passwords in API responses.
+## Authentication
+- Use JWT for authenticated requests.
+- Hash passwords before storing them.
+- Never store plain text passwords.
+- Keep token lifetime short enough for safety.
+- Require authentication for protected actions.
 
 ---
 
-# 5. Input Validation
-
-Validate all user input on the backend.
-
-Check for:
-
-- Required fields
-- Data types
-- Length limits
-- Valid email format
-- Coordinate ranges
-- Invalid characters
-
-Never trust frontend validation alone.
+## Authorization
+- Use role-based access control.
+- Supported roles:
+  - USER
+  - PROVIDER
+  - ADMIN
+- Restrict write operations to authorized roles only.
+- Admin-only actions must never be exposed to normal users.
 
 ---
 
-# 6. API Security
-
-- Use HTTPS in production.
-- Validate every request.
-- Return proper HTTP status codes.
-- Do not expose internal errors.
-- Never expose database details.
-
----
-
-# 7. Database Security
-
-- Use parameterized queries (JPA/Hibernate).
-- Never build SQL using string concatenation.
-- Use foreign keys and constraints.
-- Encrypt database credentials using environment variables.
+## Input Validation
+- Validate all API input on the backend.
+- Never trust frontend validation alone.
+- Check required fields, formats, and value ranges.
+- Reject invalid coordinates, emails, and empty strings.
+- Return clean validation messages.
 
 ---
 
-# 8. Sensitive Data
-
-Never expose:
-
-- Passwords
-- JWT secrets
-- Database credentials
-- API keys
-- Internal IDs if unnecessary
-
-Use `.env` or environment variables for all secrets.
+## Sensitive Data
+- Do not commit secrets to GitHub.
+- Keep passwords, tokens, and keys in environment variables.
+- Never expose database credentials in frontend code.
+- Do not return internal secrets in API responses.
 
 ---
 
-# 9. Error Handling
-
-Return user-friendly error messages.
-
-Do not expose:
-
-- Stack traces
-- SQL errors
-- File paths
-- Internal server details
-
-Log detailed errors on the server only.
+## API Protection
+- Protect all write endpoints.
+- Keep public endpoints read-only where possible.
+- Use proper HTTP status codes.
+- Return generic error messages for server failures.
+- Do not expose stack traces to users.
 
 ---
 
-# 10. Logging
-
-Log important events such as:
-
-- User login
-- Registration
-- Failed authentication
-- Facility creation
-- Verification actions
-- Admin activities
-
-Never log passwords or tokens.
+## Database Safety
+- Use parameterized queries through JPA/Hibernate.
+- Avoid raw SQL unless necessary.
+- Keep database access inside repository classes.
+- Use least-privilege database credentials.
 
 ---
 
-# 11. File Upload Security
-
-If file uploads are added:
-
-- Validate file type.
-- Limit file size.
-- Rename uploaded files.
-- Scan files if required.
-- Store outside the public directory.
+## Frontend Safety
+- Store only the minimum required auth data in the browser.
+- Do not place secret logic in React code.
+- Keep all sensitive checks on the backend.
+- Sanitize user-visible text when needed.
 
 ---
 
-# 12. Rate Limiting
-
-Protect public APIs by limiting requests.
-
-Examples:
-
-- Login API
-- Registration API
-- Search API
-
-Prevent brute-force and abuse.
+## Admin Actions
+- Log important admin actions.
+- Require admin verification for sensitive changes.
+- Protect approval and deletion endpoints.
+- Keep audit records for moderation actions.
 
 ---
 
-# 13. CORS Policy
-
-Allow requests only from trusted frontend domains.
-
-Do not use unrestricted (`*`) CORS in production.
-
----
-
-# 14. Dependency Security
-
-- Keep dependencies updated.
-- Remove unused libraries.
-- Monitor known vulnerabilities.
-- Use stable versions.
+## Error Handling
+- Show user-friendly messages.
+- Hide internal exception details from users.
+- Log technical details on the server only.
+- Return consistent error response shapes.
 
 ---
 
-# 15. Deployment Security
+## Environment Variables
+Keep these outside the codebase:
+- JWT secret
+- database password
+- backend URL
+- frontend API URL
+- deployment credentials
 
-- Enable HTTPS.
-- Store secrets securely.
-- Disable debug mode.
-- Restrict database access.
-- Use secure environment variables.
-
----
-
-# 16. Future Enhancements
-
-Future versions may include:
-
-- Multi-Factor Authentication (MFA)
-- OAuth2 / Google Login
-- Refresh Tokens
-- Account Lockout
-- Audit Dashboard
-- Encryption for sensitive records
+Use `.env.example` for reference only.
 
 ---
 
-# 17. Security Checklist
-
-Before deployment, verify:
-
-- Passwords are hashed.
-- JWT authentication works.
-- Authorization rules are enforced.
-- Input validation is complete.
-- Secrets are not committed to Git.
-- HTTPS is enabled.
-- API endpoints are protected.
-- Error messages do not leak sensitive information.
-- Dependencies are up to date.
+## Future Security Improvements
+Later versions may add:
+- refresh tokens
+- account lockout
+- multi-factor authentication
+- rate limiting
+- audit dashboards
+- request throttling
 
 ---
 
-# 18. Definition of Secure Code
-
-Code is considered secure when it:
-
-- Validates all inputs.
-- Protects sensitive data.
-- Uses secure authentication.
-- Enforces authorization.
-- Prevents common web vulnerabilities.
-- Follows OWASP best practices.
+## Final Rule
+If a feature needs stronger security, add it on the backend first.
+Do not depend on the frontend for protection.
