@@ -9,7 +9,7 @@
 
 ---
 
-## 1. Purpose of This Document
+## 1. Purpose of This Document 
 
 This document defines the API structure for RescueRoute.
 
