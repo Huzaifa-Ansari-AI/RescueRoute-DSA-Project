@@ -1,4 +1,4 @@
-Absolutely. Below is a **complete `docs/ARCHITECTURE.md`** you can paste directly into your repository.
+Absolutely. Below is a **complete `docs/ARCHITECTURE.md`** you can paste directly into your repository. 
 
 ````markdown
 # RescueRoute Architecture
