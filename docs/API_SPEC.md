@@ -1,7 +1,7 @@
 # RescueRoute API Specification  
 
 **Project Name:** RescueRoute    
-**API Type:** REST API  
+**API Type:** REST API   
 **Backend:** Java Spring Boot  
 **Frontend:** React + TypeScript  
 **Version:** 1.0  
