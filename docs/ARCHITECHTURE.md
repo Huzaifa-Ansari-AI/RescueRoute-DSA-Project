@@ -1,7 +1,7 @@
 Absolutely. Below is a **complete `docs/ARCHITECTURE.md`** you can paste directly into your repository.
 
 ````markdown
-# RescueRoute Architecture   
+# RescueRoute Architecture
 
 **Project Name:** RescueRoute  
 **Tagline:** Helping people find the right medical help at the right time.  
