@@ -1,4 +1,4 @@
-# RescueRoute API Specification    
+# RescueRoute API Specification     
      
 **Project Name:** RescueRoute     
 **API Type:** REST API   
