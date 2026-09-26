@@ -1,7 +1,7 @@
-# RescueRoute Coding Standards
+# Coding Standards
 
-## Purpose
-These standards define how RescueRoute should be coded so the project stays clean, consistent, easy to maintain, and fast to finish.
+**Project:** RescueRoute  
+**Version:** 1.0
 
 ---
 
@@ -175,17 +175,15 @@ When using VS Code Agent or any AI tool:
 
 ---
 
-## Definition of Good Code
-Code is good when it is:
-- clear
-- working
-- consistent
-- easy to change
-- easy to test
-- easy to explain
+# 15. Definition of Done
 
----
+A feature is complete only if:
 
-## Final Rule
-If a simple solution solves the problem, use it first.
-Only add complexity when the project truly needs it.
+- Code compiles successfully.
+- No linting errors.
+- API works correctly.
+- Frontend integrates successfully.
+- Validation is implemented.
+- Error handling is included.
+- Documentation is updated.
+- Code follows these standards.
