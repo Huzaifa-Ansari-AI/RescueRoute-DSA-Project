@@ -1,6 +1,11 @@
 # Coding Standards
+<<<<<<< HEAD
 
 **Project:** RescueRoute  
+=======
+     
+**Project:** RescueRoute
+>>>>>>> 009bf5089ad60622a13d96b9ce11d514c2d0d3cd
 **Version:** 1.0
 
 ---

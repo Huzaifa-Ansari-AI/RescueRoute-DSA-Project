@@ -1,9 +1,78 @@
+<<<<<<< HEAD
 # RescueRoute API Spec
 
 ## Overview
 RescueRoute uses a REST API for all frontend and backend communication.
 
 All endpoints return JSON.
+=======
+# RescueRoute API Specification     
+      
+**Project Name:** RescueRoute     
+**API Type:** REST API   
+**Backend:** Java Spring Boot  
+**Frontend:** React + TypeScript  
+**Version:** 1.0  
+**Base Format:** JSON over HTTP
+
+---
+
+## 1. Purpose of This Document 
+
+This document defines the API structure for RescueRoute.
+
+It describes:
+
+- the API design principles,
+- common request/response behavior,
+- authentication flow,
+- resource endpoints,
+- role-based access patterns,
+- and error handling conventions.
+
+This document is intended to keep frontend and backend implementation aligned.
+
+---
+
+## 2. API Design Goals
+
+The API must be:
+
+- clear,
+- consistent,
+- RESTful,
+- secure,
+- easy to consume from React,
+- easy to extend in future versions,
+- and suitable for production use.
+
+---
+
+## 3. API Design Principles
+
+### General Principles
+
+- use nouns for resource names,
+- use standard HTTP methods,
+- return JSON responses,
+- validate request bodies,
+- return meaningful HTTP status codes,
+- keep endpoints predictable,
+- do not expose internal implementation details.
+
+### Example REST Style
+
+- `GET /api/facilities`
+- `POST /api/auth/register`
+- `PUT /api/facilities/{id}`
+- `DELETE /api/facilities/{id}`
+
+---
+
+## 4. Base API Structure
+
+All version 1 APIs should use a common prefix:
+>>>>>>> 009bf5089ad60622a13d96b9ce11d514c2d0d3cd
 
 Base path:
 ```text
@@ -186,6 +255,7 @@ GET /api/v1/admin/logs
 
 Returns admin activity logs.
 
+<<<<<<< HEAD
 API Rules
 Use nouns, not verbs, in endpoint names.
 Keep request and response JSON consistent.
@@ -193,3 +263,94 @@ Use validation for all writable endpoints.
 Keep controllers thin.
 Return ApiResponse for all responses.
 Protect write endpoints with authentication and roles.
+=======
+19. Error Handling
+
+All errors should return standardized JSON.
+
+Example Validation Error
+{
+  "success": false,
+  "message": "Validation failed",
+  "errors": [
+    {
+      "field": "email",
+      "message": "Email is required"
+    }
+  ]
+}
+Common Status Codes
+200 OK
+201 Created
+400 Bad Request
+401 Unauthorized
+403 Forbidden
+404 Not Found
+409 Conflict
+500 Internal Server Error
+20. Validation Rules
+Authentication
+email required
+password required
+password length requirements apply
+Facility
+name required
+type required
+coordinates required
+contact number recommended
+Search
+emergency type required in most search contexts
+coordinates should be valid decimal values if provided
+21. Pagination Format
+
+For list endpoints, response metadata should support pagination.
+
+Example
+{
+  "success": true,
+  "message": "Facilities retrieved successfully",
+  "data": {
+    "items": [],
+    "page": 0,
+    "size": 10,
+    "totalItems": 52,
+    "totalPages": 6
+  }
+}
+22. Frontend Contract Expectations
+
+The React frontend should be able to consume the API easily.
+
+Requirements
+predictable JSON structures,
+clean DTOs,
+stable endpoint contracts,
+consistent status codes,
+no leaking of entity internals,
+no dependency on database schema details.
+23. Future API Expansion
+
+Later versions may include:
+
+AI recommendation endpoints,
+emergency triage endpoints,
+live availability endpoints,
+notification endpoints,
+review endpoints,
+analytics endpoints.
+
+These are not part of Version 1.
+
+24. Summary
+
+This API specification defines a secure, structured, and extensible REST API for RescueRoute.
+
+It supports:
+
+user authentication,
+facility management,
+search and ranking,
+route optimization,
+admin verification,
+and future AI expansion.
+>>>>>>> 009bf5089ad60622a13d96b9ce11d514c2d0d3cd

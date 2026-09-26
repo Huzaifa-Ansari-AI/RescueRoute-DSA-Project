@@ -1,4 +1,9 @@
+<<<<<<< HEAD
 # RescueRoute Architecture
+=======
+````markdown
+# RescueRoute Architecture 
+>>>>>>> 009bf5089ad60622a13d96b9ce11d514c2d0d3cd
 
 ## Overview
 RescueRoute is a full-stack web application that helps users find nearby medical resources during emergencies.
@@ -123,6 +128,7 @@ Future Scope
 
 Later versions may add:
 
+<<<<<<< HEAD
 authentication
 provider dashboard
 admin dashboard
@@ -137,3 +143,94 @@ Separate UI from business logic
 Keep API responses consistent
 Build small, working features first
 Avoid unnecessary complexity
+=======
+### Phase 3
+
+Database schema and entity modeling
+
+### Phase 4
+
+Authentication and roles
+
+### Phase 5
+
+Facility registration modules
+
+### Phase 6
+
+Search, filtering, and ranking
+
+### Phase 7
+
+Graph and route optimization
+
+### Phase 8
+
+Admin verification and audit flow
+
+### Phase 9
+
+UI polish and integration
+
+### Phase 10
+
+Testing, documentation, and deployment readiness
+
+Each phase should be independently understandable and buildable.
+
+---
+
+## 22. Future Version 2 Direction
+
+Future AI-enabled enhancements may include:
+
+* Agentic AI assistant,
+* emergency triage support,
+* natural language emergency guidance,
+* smarter facility ranking,
+* medical logistics routing,
+* predictive recommendation layer.
+
+The architecture must remain flexible enough to support these additions later.
+
+---
+
+## 23. Coding Constraints for Generated Code
+
+When implementation begins, generated code must:
+
+* be complete,
+* compile cleanly,
+* include imports,
+* include package declarations,
+* include required configuration,
+* follow project structure,
+* avoid placeholders,
+* avoid unfinished stubs,
+* match the architecture in this document.
+
+---
+
+## 24. Architecture Success Criteria
+
+The architecture is successful if it enables a project that is:
+
+* useful,
+* technically strong,
+* visually professional,
+* modular,
+* scalable,
+* secure,
+* maintainable,
+* and impressive in a GitHub portfolio or interview.
+
+---
+
+## 25. Final Instruction
+
+This document is the architectural reference for the RescueRoute project.
+
+Any future implementation should remain aligned with this architecture unless I explicitly approve a change.
+
+Before generating code, always check the current phase against this architecture and follow it strictly.
+>>>>>>> 009bf5089ad60622a13d96b9ce11d514c2d0d3cd
