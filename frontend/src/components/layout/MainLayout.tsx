@@ -1,4 +1,5 @@
 import { Outlet } from "react-router-dom";
+import Navbar from "./Navbar";
 
 export default function MainLayout() {
     return (
@@ -9,12 +10,12 @@ export default function MainLayout() {
                 flexDirection: "column",
             }}
         >
-            {/* Navbar will be added later */}
+            <Navbar />
 
             <main
                 style={{
                     flex: 1,
-                    padding: "2rem",
+                    padding: "1.5rem",
                 }}
             >
                 <Outlet />

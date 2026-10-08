@@ -17,13 +17,13 @@ This roadmap defines the definitive milestone-based path to take RescueRoute fro
 
 | Component / Layer | Status | Current Reality vs. Target State |
 | :--- | :--- | :--- |
-| **Workspace & Tooling** | **NEEDS STABILIZATION** | Frontend `npm run build` fails on file casing (`BloodBankspage.tsx`); doc merge conflicts exist; DB credentials exposed in `application.properties`. |
-| **Frontend Map UI** | **PARTIALLY COMPLETE** | Leaflet map centered on Karachi with mock markers, popups, and category filtering works. Category pages are blank stubs; `api.ts` is 0 bytes. |
-| **Backend Foundation** | **PARTIALLY COMPLETE** | Spring Boot compiles cleanly; `ApiResponse<T>`, `GlobalExceptionHandler`, and `GET /api/health` implemented. No entities, repositories, or business services exist. |
-| **Database Layer** | **PLANNED** | Connection to Neon PostgreSQL configured in properties; `database/` folder is empty; schema tables and migrations not yet executed. |
-| **DSA / Ranking** | **PLANNED** | Filtering is naive string/category matching on in-memory arrays. Spatial distance, multi-criteria priority ranking, and OSRM routing are not yet built. |
-| **Authentication & Roles**| **PLANNED** | `LoginPage.tsx` is an empty stub; Spring Security and JWT token flow not yet implemented. |
-| **Provider / Admin** | **PLANNED** | Verification request workflows and audit logging documented in schema but not yet implemented. |
+| **Workspace & Tooling** | **COMPLETED** | Frontend build stable; clean scripts; no merge conflicts; env secrets secured. |
+| **Frontend Map UI** | **COMPLETED** | Leaflet map with Karachi bounds, live API facilities, category pages, routing polyline, and ranked facilities list. |
+| **Backend Foundation** | **COMPLETED** | Spring Boot REST APIs with `ApiResponse<T>`, exception handling, DTOs, and health checks. |
+| **Database Layer** | **COMPLETED** | Neon PostgreSQL configured with normalized schema (`facilities`, subtypes, `verification_requests`, `admin_logs`, `routes`). |
+| **DSA / Ranking** | **COMPLETED** | Haversine distance calculation and custom Top-K Min-Heap priority ranking engine implemented and verified. |
+| **Authentication & Roles**| **COMPLETED** | Spring Security with BCrypt, JWT stateless authentication, role checks (USER, PROVIDER, ADMIN), and React `AuthContext`. |
+| **Provider / Admin** | **COMPLETED** | Provider facility submission (`POST /api/v1/facilities`), verification request moderation queue, admin approval/rejection (`PUT /api/v1/admin/verification-requests/{id}`), audit logging (`admin_logs`), and provider & admin UI with role-based routing. |
 
 ---
 
@@ -172,48 +172,55 @@ flowchart TD
 
 ---
 
-### Milestone 6: Authentication & Role-Based Access Control
+### Milestone 6: Authentication & Role-Based Access Control [COMPLETED]
 * **Goal**: Implement secure user registration, login, and JWT-based authentication for `USER`, `PROVIDER`, and `ADMIN` roles.
 * **Tasks Included**:
-  * Backend Spring Security filter chain with JWT authentication provider.
+  * Backend Spring Security filter chain with JJWT 0.12.6 stateless authentication provider.
   * Endpoints: `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `GET /api/v1/auth/me`.
-  * Password hashing using BCrypt.
-  * Frontend authentication context, token storage in localStorage/cookies, and Axios auth interceptor.
-  * Functional [`LoginPage.tsx`](file:///d:/01_Career/4_DSA/RescueRoute-DSA-Project/frontend/src/pages/Login/LoginPage.tsx) and Registration UI.
-  * Protected route guards in [`AppRouter.tsx`](file:///d:/01_Career/4_DSA/RescueRoute-DSA-Project/frontend/src/routes/AppRouter.tsx).
-* **Frontend Work**: Login/Register forms, `AuthContext`, token management, navigation state.
-* **Backend Work**: Security configuration, JWT utility, `UserDetailsServiceImpl`, Auth controllers.
-* **Database Work**: Persist users to `users` table; enforce unique email constraint.
+  * Password hashing using BCrypt; admin self-registration rejection.
+  * Standardized JSON error envelopes (401 Unauthorized, 403 Forbidden) via custom entry point and access denied handler.
+  * Frontend `AuthContext`, `authService`, token storage in localStorage, and Axios JWT request/response interceptors.
+  * Reusable `ProtectedRoute` guard supporting role-based access control.
+  * Functional `Navbar` with role badges, user email/name, and login/logout state.
+  * Functional `LoginPage.tsx` with Sign In and Registration tabs, input validation, and role selection.
+* **Frontend Work**: Login/Register forms, `AuthContext`, `useAuth`, `Navbar`, `ProtectedRoute`, token management.
+* **Backend Work**: `SecurityConfig`, `JwtService`, `JwtAuthenticationFilter`, `UserDetailsServiceImpl`, `AuthService`, `AuthController`.
+* **Database Work**: Persist users to `users` table; enforce unique email constraint; BCrypt hashed passwords.
 * **DSA / Algorithm Work**: None.
 * **Dependencies**: Milestone 3.
 * **Verification Criteria**:
-  * User can register, log in, receive JWT, and access protected endpoints.
+  * User can register, log in, receive JWT, and access `/api/v1/auth/me`.
   * Invalid credentials return 401 Unauthorized with standardized error JSON.
-* **Expected Final State**: Secure role-aware application permitting authenticated sessions.
+  * Missing or malformed JWT returns 401 Unauthorized.
+  * Full automated test suite passes (57 tests total).
+* **Final State**: Secure role-aware application permitting authenticated sessions, fully preserving Milestones 0-5 emergency discovery and routing capabilities.
 
 ---
 
 ### Milestone 7: Provider & Admin Verification Workflows
+* **Status**: **COMPLETED**
 * **Goal**: Allow medical providers to register facilities and administrators to verify records per [docs/DATABASE_SCHEMA.md](file:///d:/01_Career/4_DSA/RescueRoute-DSA-Project/docs/DATABASE_SCHEMA.md).
 * **Tasks Included**:
   * Provider workflow:
     * `POST /api/v1/facilities` (Provider creates facility; set to unverified).
     * Auto-create record in `verification_requests`.
   * Admin workflow:
-    * `GET /api/v1/admin/verification-requests` (List pending requests).
+    * `GET /api/v1/admin/verification-requests` (List pending requests with submitter/facility details).
     * `PUT /api/v1/admin/verification-requests/{id}` (Approve or Reject with notes).
     * Insert action into `admin_logs`.
-  * Frontend Provider Facility Form (submit new medical resource).
-  * Frontend Admin Moderation Dashboard (table of pending requests with Approve/Reject actions).
+  * Frontend Provider Facility Form ([`ProviderFacilityPage.tsx`](file:///d:/01_Career/4_DSA/RescueRoute-DSA-Project/frontend/src/pages/Provider/ProviderFacilityPage.tsx)) with dynamic subtype fields for Hospital, Blood Bank, Pharmacy, Ambulance.
+  * Frontend Admin Moderation Dashboard ([`AdminVerificationPage.tsx`](file:///d:/01_Career/4_DSA/RescueRoute-DSA-Project/frontend/src/pages/Admin/AdminVerificationPage.tsx)) with pending/review views and notes for rejection.
+  * Protected route guards in [`AppRouter.tsx`](file:///d:/01_Career/4_DSA/RescueRoute-DSA-Project/frontend/src/routes/AppRouter.tsx) enforcing `PROVIDER` and `ADMIN` role access.
 * **Frontend Work**: Provider creation form, Admin verification dashboard, status badges.
-* **Backend Work**: Role-restricted endpoints (`@PreAuthorize("hasRole('ADMIN')")`), verification service.
+* **Backend Work**: Role-restricted endpoints (`@PreAuthorize("hasRole('ADMIN')")`, `@PreAuthorize("hasRole('PROVIDER')")`), `VerificationWorkflowService`.
 * **Database Work**: Transactions updating `facilities.is_verified`, `verification_requests`, and `admin_logs`.
-* **DSA / Algorithm Work**: None.
+* **DSA / Algorithm Work**: Verified automatic ranking score boost upon facility approval by existing Top-K heap engine.
 * **Dependencies**: Milestone 6 (Auth) and Milestone 2 (Facilities).
 * **Verification Criteria**:
   * Provider can submit a facility; it does not appear as verified until approved.
   * Admin approval immediately updates `is_verified` and elevates ranking score.
-* **Expected Final State**: End-to-end data lifecycle enabling provider onboarding and administrative moderation.
+  * All 78 backend tests and frontend lint/build pass.
+* **Final State**: Robust, transactional data lifecycle enabling provider facility onboarding and administrative moderation.
 
 ---
 
