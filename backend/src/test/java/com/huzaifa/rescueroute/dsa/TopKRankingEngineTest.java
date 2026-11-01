@@ -106,4 +106,60 @@ public class TopKRankingEngineTest {
         assertEquals("A", result.get(0).getFacility().getName());
         assertEquals("B", result.get(1).getFacility().getName());
     }
+
+    @Test
+    @DisplayName("Road ranking orders by score descending, then driving ETA ascending")
+    void testRoadRankingEtaOrdering() {
+        RankedFacilityResponseDto slower = RankedFacilityResponseDto.builder()
+                .facility(FacilityResponseDto.builder().id(UUID.randomUUID()).name("Slower ETA").build())
+                .score(0.85)
+                .distanceKm(6.0)
+                .drivingDistanceKm(9.0)
+                .estimatedTravelMinutes(18)
+                .build();
+
+        RankedFacilityResponseDto faster = RankedFacilityResponseDto.builder()
+                .facility(FacilityResponseDto.builder().id(UUID.randomUUID()).name("Faster ETA").build())
+                .score(0.85)
+                .distanceKm(6.5)
+                .drivingDistanceKm(8.5)
+                .estimatedTravelMinutes(12)
+                .build();
+
+        List<RankedFacilityResponseDto> ranked =
+                TopKRankingEngine.rankRoadCandidates(List.of(slower, faster), 2);
+
+        assertEquals(2, ranked.size());
+        assertEquals("Faster ETA", ranked.get(0).getFacility().getName());
+        assertEquals(1, ranked.get(0).getRank());
+        assertEquals("Slower ETA", ranked.get(1).getFacility().getName());
+        assertEquals(2, ranked.get(1).getRank());
+    }
+
+    @Test
+    @DisplayName("Road ranking places candidates with null routing metrics after reachable candidates when scores equal")
+    void testRoadRankingNullsLast() {
+        RankedFacilityResponseDto reachable = RankedFacilityResponseDto.builder()
+                .facility(FacilityResponseDto.builder().id(UUID.randomUUID()).name("Reachable").build())
+                .score(0.80)
+                .distanceKm(5.0)
+                .drivingDistanceKm(7.0)
+                .estimatedTravelMinutes(10)
+                .build();
+
+        RankedFacilityResponseDto unreachable = RankedFacilityResponseDto.builder()
+                .facility(FacilityResponseDto.builder().id(UUID.randomUUID()).name("Unreachable").build())
+                .score(0.80)
+                .distanceKm(4.0)
+                .drivingDistanceKm(null)
+                .estimatedTravelMinutes(null)
+                .build();
+
+        List<RankedFacilityResponseDto> ranked =
+                TopKRankingEngine.rankRoadCandidates(List.of(unreachable, reachable), 2);
+
+        assertEquals(2, ranked.size());
+        assertEquals("Reachable", ranked.get(0).getFacility().getName());
+        assertEquals("Unreachable", ranked.get(1).getFacility().getName());
+    }
 }

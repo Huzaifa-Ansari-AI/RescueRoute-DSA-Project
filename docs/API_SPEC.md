@@ -173,27 +173,57 @@ Logs in a user and returns a JWT token.
 ## 7. Facility APIs
 
 ### `GET /api/v1/facilities`
-Returns all facilities with optional filters.
-
-**Query Parameters:**
-- `name` (string, optional)
-- `type` (string, optional: `Hospital`, `Blood Bank`, `Pharmacy`, `Ambulance`)
-- `city` (string, optional)
-- `verified` (boolean, optional)
-- `page` (integer, optional)
-- `size` (integer, optional)
+Returns all active facilities with optional filters (`type`, `city`, `active`).
+- Soft-deleted facilities (`isActive = false`) are excluded by default from public queries.
 
 ### `GET /api/v1/facilities/{id}`
 Returns a single facility by ID along with its subtype details.
+- Returns `404 Not Found` if the facility is deactivated/soft-deleted.
+
+### `GET /api/v1/facilities/my`
+Retrieves facilities owned and managed by the authenticated provider (`ROLE_PROVIDER`), or all facilities if called by `ROLE_ADMIN`.
+- Returns both active and deactivated facilities, as well as `hasPendingUpdate` indicators.
+- **Authorization:** `Bearer <JWT>` (Role: `PROVIDER` or `ADMIN`)
+
+### `GET /api/v1/facilities/admin`
+Retrieves all registered facilities for administrative registry management, independent of the verification queue.
+- **Authorization:** `Bearer <JWT>` (Role: `ADMIN` strictly; other roles receive `403 Forbidden`)
+- **Query Parameters:**
+  - `type` (string, optional): Filter by facility type (`Hospital`, `Clinic`, `Blood Bank`, `Pharmacy`, `Ambulance`)
+  - `city` (string, optional): Filter by city (e.g. `Karachi`)
+  - `active` (boolean, optional): Filter by activation status (`true` for active, `false` for soft-deleted/deactivated; omit for all)
+  - `verified` (boolean, optional): Filter by verification status (`true` for verified, `false` for unverified; omit for all)
+- **Response:** HTTP 200 OK with list of `FacilityResponseDto` including live lifecycle fields (`isActive`, `deletedAt`, `isVerified`, `hasPendingUpdate`).
 
 ### `POST /api/v1/facilities`
-Creates a new facility (requires `PROVIDER` or `ADMIN` role).
+Creates a new facility and automatically creates an unreviewed verification request.
+- **Authorization:** `Bearer <JWT>` (Role: `PROVIDER` or `ADMIN`)
+- Returns `201 Created` with `FacilityResponseDto` (`isVerified = false`).
 
 ### `PUT /api/v1/facilities/{id}`
-Updates an existing facility (requires ownership or `ADMIN` role).
+Submits staged updates for an existing facility.
+- **Authorization:** `Bearer <JWT>` (Role: `PROVIDER` owning the facility, or `ADMIN`)
+- **Staged Re-Verification Workflow:**
+  - Material changes (name, address, city, coordinates, contact, emergency readiness, ICU/trauma capabilities) are captured in `proposedChanges` JSON and submitted as an `UPDATE` verification request.
+  - Sets `hasPendingUpdate = true` on the facility.
+  - The live public facility directory continues serving the verified data until an administrator reviews and approves the staged update.
+  - Prevents IDOR: A provider attempting to edit another provider's facility receives `403 Forbidden`.
+  - Protects immutable and sensitive fields: IDs, ownership, audit timestamps, and active flags cannot be altered.
 
 ### `DELETE /api/v1/facilities/{id}`
-Deletes or deactivates a facility (requires `ADMIN` role).
+Soft-deletes a facility (`isActive = false`, records `deletedAt` timestamp).
+- **Authorization:** `Bearer <JWT>` (Role: `PROVIDER` owning the facility, or `ADMIN`)
+- Allows administrators to deactivate any approved facility directly from the admin management interface.
+- Preserves historical verification status (`isVerified = true` remains).
+- Immediately cancels any pending verification requests for this facility.
+- Audited with `FACILITY_DEACTIVATED` in `admin_logs`.
+- Immediately excludes the facility from public search, maps, Top-K ranking, and direct lookup.
+
+### `POST /api/v1/facilities/{id}/reactivate`
+Restores a previously soft-deleted facility (`isActive = true`, clears `deletedAt`).
+- **Authorization:** `Bearer <JWT>` (Role: `ADMIN` strictly)
+- Audited with `FACILITY_REACTIVATED` in `admin_logs`.
+- Makes the facility discoverable again in public search and direct lookups.
 
 ---
 
@@ -230,6 +260,60 @@ Deletes or deactivates a facility (requires `ADMIN` role).
 ---
 
 ## 9. Search & Discovery APIs
+
+### `GET /api/v1/facilities/search`
+Performs two-stage hybrid ranking (Haversine Min-Heap candidate shortlist + OSRM road matrix evaluation) returning top-K prioritized facilities.
+
+**Query Parameters:**
+- `lat` (double, required): User latitude
+- `lng` (double, required): User longitude
+- `type` (string, optional): Facility category filter (`Hospital`, `Clinic`, `Blood Bank`, `Pharmacy`, `Ambulance`)
+- `emergency` (boolean, optional, default: `false`): Prioritizes 24/7 emergency readiness, ICU, and trauma centers
+- `k` (integer, optional, default: `10`): Limit on top-ranked facilities returned
+
+**Response Schema (`RankedFacilityResponseDto`):**
+```json
+{
+  "success": true,
+  "message": "Ranked facilities retrieved successfully",
+  "data": [
+    {
+      "id": "c1a2b3c4-d5e6-7890-abcd-ef1234567890",
+      "name": "Jinnah Postgraduate Medical Centre (JPMC)",
+      "facilityType": "Hospital",
+      "address": "Rafiqui Shaheed Road, Karachi",
+      "city": "Karachi",
+      "latitude": 24.8524,
+      "longitude": 67.0456,
+      "phoneNumber": "021-99201300",
+      "isVerified": true,
+      "isActive": true,
+      "distanceKm": 6.6,
+      "straightLineDistanceKm": 6.6,
+      "drivingDistanceKm": 8.7,
+      "estimatedTravelMinutes": 11,
+      "distanceMetricUsed": "ROAD_TRAVEL_TIME",
+      "routingAvailable": true,
+      "score": 85.5,
+      "isEmergencyReady": true,
+      "hospitalDetails": {
+        "emergencyAvailable": true,
+        "icuAvailable": true,
+        "traumaCenterAvailable": true
+      }
+    }
+  ],
+  "timestamp": "2026-10-29T12:00:00"
+}
+```
+
+**Dual-Distance & Routing Metric Fields:**
+- `distanceKm`: Preserved for backward compatibility (straight-line Haversine distance in km, rounded to 1 decimal).
+- `straightLineDistanceKm`: Explicit straight-line Haversine distance in km (rounded to 1 decimal).
+- `drivingDistanceKm`: Real-world OSRM driving distance in km (rounded to 1 decimal; `null` if routing unavailable).
+- `estimatedTravelMinutes`: OSRM road network estimated travel duration in minutes (`null` if routing unavailable).
+- `distanceMetricUsed`: `ROAD_TRAVEL_TIME` when OSRM road matrix succeeds; `HAVERSINE_FALLBACK` when OSRM fails, times out, or candidates are unreachable.
+- `routingAvailable`: Boolean indicating whether road-network driving metrics were successfully obtained.
 
 ### `GET /api/v1/search`
 Searches facilities by keyword, type, city, and verification status.
@@ -297,7 +381,12 @@ Creates a new facility and automatically creates an unreviewed verification requ
 Returns pending or filtered verification requests with full facility and submitter context (Admin only).
 - **Authorization:** `Bearer <JWT>` (Role: `ADMIN`)
 - **Query Params:** `status` (e.g. `PENDING`, `APPROVED`, `REJECTED`)
-- **Response:** HTTP 200 OK with list of `VerificationRequestResponseDto`.
+- **Response:** HTTP 200 OK with list of `VerificationRequestResponseDto` including:
+  - `requestType`: `"CREATION"` (new facility registration) or `"UPDATE"` (staged facility modification).
+  - `proposedChanges`: Serialized JSON string of the proposed fields when `requestType = "UPDATE"`.
+  - `facilityActive`: Boolean flag indicating live directory activation status (`true` = active, `false` = soft-deleted/deactivated).
+  - `facilityDeletedAt`: ISO-8601 deletion timestamp if deactivated, or `null` if active.
+  - `facilityHasPendingUpdate`: Boolean flag indicating if unapproved staged modifications are pending review.
 
 ### `PUT /api/v1/admin/verification-requests/{id}`
 Approves or rejects a verification request with audit logging (Admin only).
@@ -309,7 +398,10 @@ Approves or rejects a verification request with audit logging (Admin only).
   "reviewNotes": "Sindh Healthcare Commission license verified"
 }
 ```
-- **Response:** HTTP 200 OK with updated `VerificationRequestResponseDto` (`facilityVerified = true/false`).
+- **Response:** HTTP 200 OK with updated `VerificationRequestResponseDto`.
+- **Workflow Mechanics:**
+  - For `CREATION` requests: Approving marks the facility as `isVerified = true`.
+  - For `UPDATE` requests: Approving unpacks `proposedChanges`, applies the approved fields to the live facility, marks the facility as `isVerified = true`, and clears `hasPendingUpdate = false`. Rejecting discards the proposed changes and clears `hasPendingUpdate = false` without corrupting live data.
 - **Convenience routes:** Also accessible via `PUT /api/v1/admin/verification-requests/{id}/approve` and `PUT /api/v1/admin/verification-requests/{id}/reject`.
 
 ---
@@ -361,12 +453,101 @@ The React frontend consumes the API following these contracts:
 
 ---
 
-## 16. Future Version 2 Expansion
+---
 
-Later versions may include:
-- AI recommendation endpoints,
-- Emergency triage guidance,
-- Live bed/blood inventory WebSockets,
-- Notification endpoints.
+## 17. External Facilities API (Phase 4: OpenStreetMap / Overpass Integration)
 
-These are planned for Version 2 and are not part of Version 1.
+Endpoints for querying, importing, and moderating crowd-sourced medical points of interest from OpenStreetMap Overpass. External listings are stored in a dedicated `external_facilities` table, clearly labeled with attribution and clinical disclaimers, and excluded from trusted emergency ranking.
+
+### `GET /api/v1/external-facilities`
+Searches discovered external facilities within a geographic radius.
+- **Authorization:** Public (Permit All)
+- **Query Parameters:**
+  - `lat` (double, required): Latitude [-90.0, 90.0]
+  - `lng` (double, required): Longitude [-180.0, 180.0]
+  - `radiusMeters` (double, optional, default: 5000): Bounded radius in meters (100 to 10,000)
+  - `type` (string, optional): Facility category filter (`Hospital`, `Clinic`, `Pharmacy`, `Blood Bank`, `Ambulance`)
+  - `status` (string, optional): Import status filter (`DISCOVERED`, `DUPLICATE_CANDIDATE`, `REVIEWED`, `SUPPRESSED`)
+- **Response Shape (HTTP 200 OK):**
+```json
+{
+  "success": true,
+  "message": "External facilities retrieved successfully",
+  "data": [
+    {
+      "id": "e4f8d2a1-...",
+      "source": "OPENSTREETMAP",
+      "osmElementType": "node",
+      "osmElementId": 1001,
+      "sourceUrl": "https://www.openstreetmap.org/node/1001",
+      "name": "Civil Hospital Karachi",
+      "facilityType": "Hospital",
+      "osmTags": "{\"amenity\":\"hospital\",\"name\":\"Civil Hospital Karachi\"}",
+      "latitude": 24.8615,
+      "longitude": 67.0025,
+      "address": "Mission Road",
+      "city": "Karachi",
+      "phoneNumber": "+92 21 99215740",
+      "website": null,
+      "openingHours": "24/7",
+      "importStatus": "DISCOVERED",
+      "matchedFacilityId": null,
+      "matchedFacilityName": null,
+      "distanceKm": 0.85,
+      "attribution": "© OpenStreetMap contributors",
+      "disclaimer": "External listing · OpenStreetMap · Not verified by RescueRoute",
+      "isVerified": false,
+      "importedAt": "2026-10-30T00:30:00Z",
+      "lastSeenAt": "2026-10-30T00:30:00Z"
+    }
+  ]
+}
+```
+
+### `POST /api/v1/external-facilities/import`
+Triggers a bounded geographic query against the Overpass API, normalizes medical tags, performs Level 2 duplicate detection against internal facilities, and idempotently upserts records.
+- **Authorization:** `Bearer <JWT>` (Roles: `ADMIN`, `PROVIDER`)
+- **Request Body:**
+```json
+{
+  "latitude": 24.8607,
+  "longitude": 67.0011,
+  "radiusMeters": 5000,
+  "facilityType": "Hospital"
+}
+```
+- **Response Shape (HTTP 200 OK):**
+```json
+{
+  "success": true,
+  "message": "Successfully processed 14 facilities (10 imported, 4 updated, 2 duplicate candidates flagged).",
+  "data": {
+    "totalQueried": 14,
+    "imported": 10,
+    "updated": 4,
+    "duplicateCandidates": 2,
+    "skipped": 0,
+    "failed": 0,
+    "executionTimeMs": 340,
+    "message": "Successfully processed 14 facilities (10 imported, 4 updated, 2 duplicate candidates flagged)."
+  }
+}
+```
+
+### `GET /api/v1/external-facilities/{id}`
+Retrieves detailed normalized attributes of an external facility by its internal UUID.
+- **Authorization:** Public (Permit All)
+- **Response:** HTTP 200 OK with `ExternalFacilityResponseDto` or HTTP 404 Not Found.
+
+### `PUT /api/v1/external-facilities/{id}/status`
+Moderates an external facility's status (Admin only).
+- **Authorization:** `Bearer <JWT>` (Role: `ADMIN`)
+- **Request Body:**
+```json
+{
+  "status": "REVIEWED",
+  "notes": "Verified facility license and active status"
+}
+```
+- **Response Shape (HTTP 200 OK):** HTTP 200 OK with updated `ExternalFacilityResponseDto`. Valid statuses: `DISCOVERED`, `DUPLICATE_CANDIDATE`, `REVIEWED`, `SUPPRESSED`.
+

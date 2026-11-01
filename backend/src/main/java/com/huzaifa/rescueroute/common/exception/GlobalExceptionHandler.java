@@ -160,6 +160,31 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handle upstream external service failures (e.g. Overpass API timeouts, rate limits).
+     */
+    @ExceptionHandler(ExternalServiceException.class)
+    public ResponseEntity<ApiResponse<Object>> handleExternalServiceException(ExternalServiceException ex) {
+        log.warn("External service failure: {}", ex.getMessage());
+        ApiResponse<Object> response = ApiResponse.error(ex.getMessage());
+        return ResponseEntity
+                .status(ex.getStatus())
+                .body(response);
+    }
+
+    /**
+     * Handle missing static resources or unmapped endpoints cleanly as HTTP 404.
+     */
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Object>> handleNoResourceFound(
+            org.springframework.web.servlet.resource.NoResourceFoundException ex) {
+
+        ApiResponse<Object> response = ApiResponse.error("Resource not found: " + ex.getResourcePath());
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(response);
+    }
+
+    /**
      * Handle unexpected exceptions.
      */
     @ExceptionHandler(Exception.class)

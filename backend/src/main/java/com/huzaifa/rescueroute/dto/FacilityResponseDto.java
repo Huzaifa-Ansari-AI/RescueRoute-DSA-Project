@@ -35,6 +35,11 @@ public class FacilityResponseDto {
     @JsonProperty("isActive")
     private boolean isActive;
 
+    @JsonProperty("hasPendingUpdate")
+    private boolean hasPendingUpdate;
+
+    private Instant deletedAt;
+
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -42,4 +47,5 @@ public class FacilityResponseDto {
     private BloodBankDetailsDto bloodBankDetails;
     private PharmacyDetailsDto pharmacyDetails;
     private AmbulanceDetailsDto ambulanceDetails;
+    private ClinicDetailsDto clinicDetails;
 }

@@ -52,6 +52,13 @@ public class Facility {
     @Builder.Default
     private boolean isActive = true;
 
+    @Column(name = "has_pending_update", nullable = false)
+    @Builder.Default
+    private boolean hasPendingUpdate = false;
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")
     private User createdBy;
@@ -73,6 +80,9 @@ public class Facility {
 
     @OneToOne(mappedBy = "facility", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Ambulance ambulance;
+
+    @OneToOne(mappedBy = "facility", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private Clinic clinic;
 
     @PrePersist
     protected void onCreate() {

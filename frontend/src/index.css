@@ -58,7 +58,7 @@
   --radius-full: 9999px;
 
   /* Typography */
-  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   color-scheme: light;
 }
 
@@ -178,3 +178,79 @@ button:focus-visible {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* =============================================================================
+   Responsive Navigation Utilities
+   ============================================================================= */
+
+.desktop-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mobile-nav-toggle {
+  display: none;
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 18px;
+  cursor: pointer;
+  color: #334155;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-nav-drawer {
+  display: none;
+}
+
+@media (max-width: 960px) {
+  .desktop-nav {
+    display: none !important;
+  }
+  .mobile-nav-toggle {
+    display: flex !important;
+  }
+  .mobile-nav-drawer {
+    display: flex !important;
+    flex-direction: column;
+    width: 100%;
+    padding: 12px 0 8px 0;
+    gap: 8px;
+    border-top: 1px solid #e2e8f0;
+    margin-top: 10px;
+  }
+}
+
+/* =============================================================================
+   Responsive Main Layout Utilities
+   ============================================================================= */
+
+.nav-hub-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .nav-hub-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+}
+
+.home-split-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .home-split-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+

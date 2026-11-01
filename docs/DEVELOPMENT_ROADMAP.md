@@ -242,3 +242,31 @@ flowchart TD
   * Backend deploys to Render and connects to Neon DB.
   * Public URL allows full flow: search $\rightarrow$ filter $\rightarrow$ rank $\rightarrow$ route.
 * **Expected Final State**: High-quality, publicly deployed emergency healthcare routing portfolio project.
+
+---
+
+## 4. Production Improvement Phases
+
+### Phase 1: First-Class Clinic Support & Schema Alignment
+* **Status**: **COMPLETED**
+* **Summary**: Supported `Clinic` as a first-class facility type across backend JPA entities, migrations, API validation, DTOs, and frontend UI.
+
+### Phase 2: Accurate Road-Based Ranking & Dual-Distance Display
+* **Status**: **COMPLETED**
+* **Summary**: Replaced straight-line sorting with OSRM Table API driving distance and duration metrics, dual-distance presentation, straight-line fallback, and thread-safe matrix caching.
+
+### Phase 3: Facility Updates, Soft Deletion, Admin Registry & Re-Verification
+* **Status**: **COMPLETED**
+* **Summary**: Implemented staged provider updates, audit logging, soft deactivation, admin reactivation, full lifecycle synchronization, N+1 query optimization, and timeout elimination.
+
+### Phase 4: OpenStreetMap / Overpass External Facility Discovery
+* **Status**: **COMPLETED**
+* **Summary**:
+  * Implemented resilient Overpass client querying bounded geographic areas (lat, lng, radius in meters).
+  * Tag normalization across `Hospital`, `Clinic`, `Pharmacy`, `Blood Bank`, and `Ambulance` categories with rejection of ambiguous tags.
+  * Level 1 (exact source element uniqueness) and Level 2 (spatial proximity within 150m + normalized token matching) duplicate detection against internal facilities.
+  * Dedicated `external_facilities` PostgreSQL table completely segregated from trusted clinical `facilities`.
+  * Public external search API (`GET /api/v1/external-facilities`) and protected import API (`POST /api/v1/external-facilities/import`).
+  * Dedicated interactive UI at `/external-discovery` with cyan/teal markers, radius visualizer, ODbL attribution, and prominent unverified disclaimers.
+  * Preserved Phases 1–3, OSRM road-ranking, and admin moderation workflows.
+  * 132/132 automated backend tests passing, 0 frontend lint errors, clean production build.

@@ -182,7 +182,7 @@ export const RouteSummary: React.FC<RouteSummaryProps> = ({
             }}
           >
             <span>
-              📏 Driving Distance: <strong>{route.distanceKm} km</strong>
+              📏 Driving Distance: <strong>{route.distanceKm.toFixed(1)} km</strong>
             </span>
             <span>
               ⏱️ Estimated Travel Time: <strong>{route.durationMinutes} min</strong>

@@ -15,6 +15,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.jpa.domain.Specification;
 
+import com.huzaifa.rescueroute.entity.AdminLog;
+import com.huzaifa.rescueroute.entity.User;
+import com.huzaifa.rescueroute.entity.UserRole;
+import com.huzaifa.rescueroute.entity.VerificationRequest;
+import org.mockito.ArgumentCaptor;
+import org.springframework.security.access.AccessDeniedException;
+
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -42,6 +50,18 @@ public class FacilityServiceTest {
     @Mock
     private AmbulanceRepository ambulanceRepository;
 
+    @Mock
+    private ClinicRepository clinicRepository;
+
+    @Mock
+    private VerificationRequestRepository verificationRequestRepository;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private AdminLogRepository adminLogRepository;
+
     private FacilityMapper facilityMapper;
     private FacilityService facilityService;
 
@@ -54,7 +74,11 @@ public class FacilityServiceTest {
                 bloodBankRepository,
                 pharmacyRepository,
                 ambulanceRepository,
-                facilityMapper
+                clinicRepository,
+                facilityMapper,
+                userRepository,
+                verificationRequestRepository,
+                adminLogRepository
         );
     }
 
@@ -232,5 +256,248 @@ public class FacilityServiceTest {
 
         assertTrue(exception.getMessage().contains("Facility not found with ID: " + nonExistentId));
         verify(facilityRepository, times(1)).findById(nonExistentId);
+    }
+
+    @Test
+    @DisplayName("Retrieve facility by ID throws ResourceNotFoundException if facility is deactivated (soft-deleted)")
+    void testGetFacilityById_Deactivated_ThrowsResourceNotFound() {
+        UUID facilityId = UUID.randomUUID();
+        Facility deactivated = Facility.builder()
+                .id(facilityId)
+                .name("Old Deactivated Clinic")
+                .facilityType("Clinic")
+                .isActive(false)
+                .build();
+
+        when(facilityRepository.findById(facilityId)).thenReturn(Optional.of(deactivated));
+
+        assertThrows(ResourceNotFoundException.class, () ->
+                facilityService.getFacilityById(facilityId));
+    }
+
+    @Test
+    @DisplayName("Provider deactivates owned facility: sets isActive false, sets deletedAt, cancels pending verification, logs audit")
+    void testDeactivateFacility_Success() {
+        User provider = User.builder()
+                .id(UUID.randomUUID())
+                .email("dr.provider@rescueroute.com")
+                .role(UserRole.PROVIDER)
+                .build();
+
+        Facility facility = Facility.builder()
+                .id(UUID.randomUUID())
+                .name("Provider Clinic")
+                .facilityType("Clinic")
+                .isActive(true)
+                .createdBy(provider)
+                .build();
+
+        VerificationRequest pendingReq = VerificationRequest.builder()
+                .id(UUID.randomUUID())
+                .facility(facility)
+                .status("PENDING")
+                .build();
+
+        when(facilityRepository.findById(facility.getId())).thenReturn(Optional.of(facility));
+        when(userRepository.findByEmail(provider.getEmail())).thenReturn(Optional.of(provider));
+        when(verificationRequestRepository.findByFacilityIdAndStatus(facility.getId(), "PENDING"))
+                .thenReturn(List.of(pendingReq));
+        when(facilityRepository.save(any(Facility.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        facilityService.deactivateFacility(facility.getId(), provider.getEmail());
+
+        assertFalse(facility.isActive(), "Facility must be marked isActive = false");
+        assertNotNull(facility.getDeletedAt(), "deletedAt timestamp must be recorded");
+        assertEquals("REJECTED", pendingReq.getStatus(), "Pending verification requests must be marked REJECTED upon deactivation");
+        assertTrue(pendingReq.getReviewNotes().contains("deactivation"));
+
+        ArgumentCaptor<AdminLog> logCaptor = ArgumentCaptor.forClass(AdminLog.class);
+        verify(adminLogRepository).save(logCaptor.capture());
+        assertEquals("FACILITY_DEACTIVATED", logCaptor.getValue().getActionType());
+    }
+
+    @Test
+    @DisplayName("Unauthorized provider cannot deactivate another provider's facility (AccessDeniedException)")
+    void testDeactivateFacility_CrossProvider_AccessDenied() {
+        User owner = User.builder()
+                .id(UUID.randomUUID())
+                .email("owner@rescueroute.com")
+                .role(UserRole.PROVIDER)
+                .build();
+
+        User attacker = User.builder()
+                .id(UUID.randomUUID())
+                .email("attacker@rescueroute.com")
+                .role(UserRole.PROVIDER)
+                .build();
+
+        Facility facility = Facility.builder()
+                .id(UUID.randomUUID())
+                .name("Protected Clinic")
+                .facilityType("Clinic")
+                .isActive(true)
+                .createdBy(owner)
+                .build();
+
+        when(facilityRepository.findById(facility.getId())).thenReturn(Optional.of(facility));
+        when(userRepository.findByEmail(attacker.getEmail())).thenReturn(Optional.of(attacker));
+
+        assertThrows(AccessDeniedException.class, () ->
+                facilityService.deactivateFacility(facility.getId(), attacker.getEmail()));
+
+        assertTrue(facility.isActive());
+        verify(facilityRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Admin reactivates deactivated facility: sets isActive true, clears deletedAt, logs audit")
+    void testReactivateFacility_AdminSuccess() {
+        User admin = User.builder()
+                .id(UUID.randomUUID())
+                .email("admin@rescueroute.com")
+                .role(UserRole.ADMIN)
+                .build();
+
+        Facility facility = Facility.builder()
+                .id(UUID.randomUUID())
+                .name("Deactivated Clinic")
+                .facilityType("Clinic")
+                .isActive(false)
+                .deletedAt(Instant.now())
+                .build();
+
+        when(facilityRepository.findById(facility.getId())).thenReturn(Optional.of(facility));
+        when(userRepository.findByEmail(admin.getEmail())).thenReturn(Optional.of(admin));
+        when(facilityRepository.save(any(Facility.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        facilityService.reactivateFacility(facility.getId(), admin.getEmail());
+
+        assertTrue(facility.isActive(), "Facility must be reactivated");
+        assertNull(facility.getDeletedAt(), "deletedAt must be cleared upon reactivation");
+
+        ArgumentCaptor<AdminLog> logCaptor = ArgumentCaptor.forClass(AdminLog.class);
+        verify(adminLogRepository).save(logCaptor.capture());
+        assertEquals("FACILITY_REACTIVATED", logCaptor.getValue().getActionType());
+    }
+
+    @Test
+    @DisplayName("Non-admin user cannot reactivate facility (AccessDeniedException)")
+    void testReactivateFacility_NonAdmin_AccessDenied() {
+        User provider = User.builder()
+                .id(UUID.randomUUID())
+                .email("provider@rescueroute.com")
+                .role(UserRole.PROVIDER)
+                .build();
+
+        Facility facility = Facility.builder()
+                .id(UUID.randomUUID())
+                .name("Deactivated Clinic")
+                .facilityType("Clinic")
+                .isActive(false)
+                .build();
+
+        when(facilityRepository.findById(facility.getId())).thenReturn(Optional.of(facility));
+        when(userRepository.findByEmail(provider.getEmail())).thenReturn(Optional.of(provider));
+
+        assertThrows(AccessDeniedException.class, () ->
+                facilityService.reactivateFacility(facility.getId(), provider.getEmail()));
+
+        assertFalse(facility.isActive());
+        verify(facilityRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Retrieve facilities owned by authenticated provider")
+    void testGetFacilitiesByProvider_Success() {
+        User provider = User.builder()
+                .id(UUID.randomUUID())
+                .email("provider@rescueroute.com")
+                .role(UserRole.PROVIDER)
+                .build();
+
+        Facility facility1 = Facility.builder()
+                .id(UUID.randomUUID())
+                .name("Provider Facility 1")
+                .facilityType("Hospital")
+                .isActive(true)
+                .createdBy(provider)
+                .build();
+
+        when(userRepository.findByEmail(provider.getEmail())).thenReturn(Optional.of(provider));
+        when(facilityRepository.findByCreatedById(provider.getId())).thenReturn(List.of(facility1));
+
+        List<FacilityResponseDto> result = facilityService.getFacilitiesByProvider(provider.getEmail());
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals("Provider Facility 1", result.get(0).getName());
+    }
+
+    @Test
+    @DisplayName("Admin can deactivate any approved facility (even if owned by provider)")
+    void testAdminDeactivateFacility_Success() {
+        User provider = User.builder()
+                .id(UUID.randomUUID())
+                .email("provider@rescueroute.com")
+                .role(UserRole.PROVIDER)
+                .build();
+
+        User admin = User.builder()
+                .id(UUID.randomUUID())
+                .email("admin@rescueroute.com")
+                .role(UserRole.ADMIN)
+                .build();
+
+        Facility facility = Facility.builder()
+                .id(UUID.randomUUID())
+                .name("Approved Hospital")
+                .facilityType("Hospital")
+                .isActive(true)
+                .isVerified(true)
+                .createdBy(provider)
+                .build();
+
+        when(facilityRepository.findById(facility.getId())).thenReturn(Optional.of(facility));
+        when(userRepository.findByEmail(admin.getEmail())).thenReturn(Optional.of(admin));
+        when(verificationRequestRepository.findByFacilityIdAndStatus(facility.getId(), "PENDING"))
+                .thenReturn(Collections.emptyList());
+        when(facilityRepository.save(any(Facility.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        facilityService.deactivateFacility(facility.getId(), admin.getEmail());
+
+        assertFalse(facility.isActive(), "Facility must be deactivated by admin");
+        assertTrue(facility.isVerified(), "Historical verification must be preserved");
+        assertNotNull(facility.getDeletedAt(), "deletedAt must be recorded");
+
+        ArgumentCaptor<AdminLog> logCaptor = ArgumentCaptor.forClass(AdminLog.class);
+        verify(adminLogRepository).save(logCaptor.capture());
+        assertEquals("FACILITY_DEACTIVATED", logCaptor.getValue().getActionType());
+    }
+
+    @Test
+    @DisplayName("Admin can retrieve all facilities matching admin filters")
+    void testGetAdminFacilities_Success() {
+        Facility f1 = Facility.builder()
+                .id(UUID.randomUUID())
+                .name("Facility Active & Verified")
+                .facilityType("Hospital")
+                .isActive(true)
+                .isVerified(true)
+                .build();
+
+        Facility f2 = Facility.builder()
+                .id(UUID.randomUUID())
+                .name("Facility Deactivated & Verified")
+                .facilityType("Hospital")
+                .isActive(false)
+                .isVerified(true)
+                .build();
+
+        when(facilityRepository.findAll(any(Specification.class))).thenReturn(List.of(f1, f2));
+
+        List<FacilityResponseDto> result = facilityService.getAdminFacilities("Hospital", "Karachi", null, true);
+
+        assertNotNull(result);
+        assertEquals(2, result.size());
     }
 }

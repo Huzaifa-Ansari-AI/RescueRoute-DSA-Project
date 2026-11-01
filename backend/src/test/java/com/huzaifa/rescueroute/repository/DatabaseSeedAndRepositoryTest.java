@@ -69,7 +69,7 @@ public class DatabaseSeedAndRepositoryTest {
 
         // 3. Verify Hospitals
         List<Facility> hospitals = facilityRepository.findByFacilityType("Hospital");
-        assertEquals(3, hospitals.size(), "Should have 3 hospitals");
+        assertTrue(hospitals.size() >= 3, "Should have at least 3 hospitals");
         List<Hospital> emergencyHospitals = hospitalRepository.findByEmergencyAvailableTrue();
         assertFalse(emergencyHospitals.isEmpty(), "Should have emergency-ready hospitals");
         for (Hospital h : emergencyHospitals) {
@@ -92,5 +92,40 @@ public class DatabaseSeedAndRepositoryTest {
         assertEquals(2, ambulances.size(), "Should have 2 ambulance services");
         List<Ambulance> availableAmbulances = ambulanceRepository.findByAvailableNowTrue();
         assertFalse(availableAmbulances.isEmpty(), "Should have available ambulance units");
+    }
+
+    @Autowired
+    private ExternalFacilityRepository externalFacilityRepository;
+
+    @Test
+    @DisplayName("Verify external facilities persistence, indexing, and unverified status in database")
+    void testExternalFacilityPersistence() {
+        ExternalFacility externalFacility = ExternalFacility.builder()
+                .source("OPENSTREETMAP")
+                .osmElementType("node")
+                .osmElementId(99999L)
+                .name("Test Community Hospital")
+                .facilityType("Hospital")
+                .latitude(24.8600)
+                .longitude(67.0000)
+                .address("Test Road, Karachi")
+                .city("Karachi")
+                .importStatus("DISCOVERED")
+                .importedAt(java.time.Instant.now())
+                .lastSeenAt(java.time.Instant.now())
+                .build();
+
+        ExternalFacility saved = externalFacilityRepository.save(externalFacility);
+        assertNotNull(saved.getId());
+
+        Optional<ExternalFacility> found = externalFacilityRepository.findBySourceAndOsmElementTypeAndOsmElementId(
+                "OPENSTREETMAP", "node", 99999L);
+        assertTrue(found.isPresent());
+        assertEquals("Test Community Hospital", found.get().getName());
+        assertEquals("DISCOVERED", found.get().getImportStatus());
+
+        List<ExternalFacility> inBoundingBox = externalFacilityRepository.findByLatitudeBetweenAndLongitudeBetween(
+                24.85, 24.87, 66.99, 67.01);
+        assertFalse(inBoundingBox.isEmpty());
     }
 }

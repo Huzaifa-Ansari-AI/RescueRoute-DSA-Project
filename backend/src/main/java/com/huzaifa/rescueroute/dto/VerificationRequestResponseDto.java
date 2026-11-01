@@ -29,9 +29,14 @@ public class VerificationRequestResponseDto {
     private Double facilityLongitude;
     private String facilityPhoneNumber;
     private boolean facilityVerified;
+    private Boolean facilityActive;
+    private Instant facilityDeletedAt;
+    private Boolean facilityHasPendingUpdate;
 
     private UserResponseDto submittedBy;
     private String status; // PENDING, APPROVED, REJECTED
+    private String requestType; // CREATION, UPDATE
+    private UpdateFacilityRequestDto proposedChanges;
     private UserResponseDto reviewedBy;
     private String reviewNotes;
 

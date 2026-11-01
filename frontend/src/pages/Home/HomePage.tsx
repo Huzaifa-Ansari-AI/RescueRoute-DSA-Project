@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 
 import MapView from "../../components/map/MapView";
 import CategoryFilter from "../../components/common/CategoryFilter";
@@ -6,7 +6,6 @@ import LocationSearchInput from "../../components/common/LocationSearchInput";
 import DestinationSearchInput from "../../components/common/DestinationSearchInput";
 import RankedFacilityCard from "../../components/facility/RankedFacilityCard";
 import RouteSummary from "../../components/route/RouteSummary";
-import Loading from "../../components/ui/Loading";
 import ErrorMessage from "../../components/ui/ErrorMessage";
 import facilityService from "../../services/facilityService";
 import routeService from "../../services/routeService";
@@ -55,6 +54,11 @@ function computeClientSideRanking(
     return {
       rank: 1,
       distanceKm: dist,
+      straightLineDistanceKm: dist,
+      drivingDistanceKm: null,
+      estimatedTravelMinutes: null,
+      distanceMetricUsed: "STRAIGHT_LINE" as const,
+      routingAvailable: false,
       score,
       isVerified: Boolean(f.isVerified),
       emergencyAvailable: Boolean(isEmerg),
@@ -75,6 +79,7 @@ export default function HomePage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [emergencyMode, setEmergencyMode] = useState<boolean>(false);
+  const [radiusKm, setRadiusKm] = useState<number>(5.0);
   const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(null);
   const [selectedDestination, setSelectedDestination] = useState<Facility | null>(null);
   const [originLocationName, setOriginLocationName] = useState<string | null>(null);
@@ -85,6 +90,7 @@ export default function HomePage() {
   const [routeLoading, setRouteLoading] = useState<boolean>(false);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [routingFacility, setRoutingFacility] = useState<Facility | null>(null);
+  const activeRoutingTargetRef = useRef<string | null>(null);
 
   const {
     coordinates,
@@ -127,9 +133,10 @@ export default function HomePage() {
         .searchRankedFacilities({
           lat: coordinates.lat,
           lng: coordinates.lng,
+          radiusKm: radiusKm,
           type: category !== "All" ? category : undefined,
           emergency: emergencyMode,
-          k: 25,
+          k: 50,
         })
         .then((rankedList) => {
           if (isMounted) {
@@ -165,11 +172,12 @@ export default function HomePage() {
     return () => {
       isMounted = false;
     };
-  }, [coordinates, category, emergencyMode, reloadKey]);
+  }, [coordinates, category, emergencyMode, radiusKm, reloadKey]);
 
   // Route calculation helper
   const calculateRoadRoute = useCallback(
     async (originCoords: { lat: number; lng: number }, destFacility: Facility) => {
+      activeRoutingTargetRef.current = destFacility.id;
       setRouteLoading(true);
       setRouteError(null);
       setRoutingFacility(destFacility);
@@ -182,36 +190,36 @@ export default function HomePage() {
           destFacility.id,
           destFacility.name
         );
-        setRoute(routeData);
-        setRouteError(null);
+        // Prevent stale async response race conditions
+        if (activeRoutingTargetRef.current === destFacility.id) {
+          setRoute(routeData);
+          setRouteError(null);
+        }
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : "Failed to calculate road route.";
-        setRouteError(message);
-        setRoute(null);
+        if (activeRoutingTargetRef.current === destFacility.id) {
+          const message = err instanceof Error ? err.message : "Failed to calculate road route.";
+          setRouteError(message);
+          setRoute(null);
+        }
       } finally {
-        setRouteLoading(false);
+        if (activeRoutingTargetRef.current === destFacility.id) {
+          setRouteLoading(false);
+        }
       }
     },
     []
   );
-
-  // Recalculate route when origin or destination changes asynchronously
-  useEffect(() => {
-    if (coordinates && selectedDestination) {
-      const timer = setTimeout(() => {
-        calculateRoadRoute(coordinates, selectedDestination);
-      }, 0);
-      return () => clearTimeout(timer);
-    }
-  }, [coordinates, selectedDestination, calculateRoadRoute]);
 
   // Point A: Select origin location (from search autocomplete, GPS, or manual)
   const handleSelectOrigin = useCallback(
     (lat: number, lng: number, placeName: string) => {
       setOriginLocationName(placeName);
       setManualLocation(lat, lng, "manual");
+      if (selectedDestination) {
+        calculateRoadRoute({ lat, lng }, selectedDestination);
+      }
     },
-    [setManualLocation]
+    [setManualLocation, selectedDestination, calculateRoadRoute]
   );
 
   // Point A: Geolocation GPS request
@@ -226,6 +234,7 @@ export default function HomePage() {
     clearLocation();
     setRoute(null);
     setRouteError(null);
+    activeRoutingTargetRef.current = null;
     routeService.cancelPendingRequest();
   }, [clearLocation]);
 
@@ -279,6 +288,13 @@ export default function HomePage() {
     setError(null);
     setReloadKey((k) => k + 1);
   };
+
+  // Explicit search button handler to re-scan and rank facilities
+  const handleManualSearch = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    setReloadKey((k) => k + 1);
+  }, []);
 
   // Filter ranked facilities by quick search query
   const filteredRanked = useMemo(() => {
@@ -407,7 +423,7 @@ export default function HomePage() {
           marginBottom: "20px",
         }}
       >
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+        <div className="nav-hub-grid">
           {/* Point A: Origin Search */}
           <LocationSearchInput
             currentCoordinates={coordinates}
@@ -419,6 +435,8 @@ export default function HomePage() {
             onClearLocation={handleClearOrigin}
             emergencyMode={emergencyMode}
             onToggleEmergency={setEmergencyMode}
+            onSearch={handleManualSearch}
+            isSearchingFacilities={loading}
           />
 
           {/* Point B: Destination Search */}
@@ -429,6 +447,86 @@ export default function HomePage() {
             onSelectDestination={handleSelectDestination}
             onClearDestination={handleClearDestination}
           />
+        </div>
+
+        {/* Coverage Radius Selector Bar */}
+        <div
+          style={{
+            marginTop: "16px",
+            paddingTop: "14px",
+            borderTop: "1px dashed #e2e8f0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "12px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "16px" }}>🎯</span>
+            <span style={{ fontSize: "13px", fontWeight: 700, color: "#1e293b" }}>
+              Discovery Radius:
+            </span>
+            <span
+              style={{
+                backgroundColor: "#eff6ff",
+                color: "#1d4ed8",
+                fontWeight: 700,
+                fontSize: "12px",
+                padding: "2px 10px",
+                borderRadius: "12px",
+                border: "1px solid #bfdbfe",
+              }}
+            >
+              {radiusKm} km
+            </span>
+            <span style={{ fontSize: "12px", color: "#64748b" }}>
+              (Live coverage area on map)
+            </span>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+            {[1, 3, 5, 10, 15, 20, 25].map((r) => {
+              const isActive = radiusKm === r;
+              return (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRadiusKm(r)}
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                    fontWeight: isActive ? 700 : 500,
+                    backgroundColor: isActive ? "#2563eb" : "#f8fafc",
+                    color: isActive ? "#ffffff" : "#475569",
+                    border: `1px solid ${isActive ? "#1d4ed8" : "#cbd5e1"}`,
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {r} km
+                </button>
+              );
+            })}
+
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "6px" }}>
+              <input
+                type="range"
+                min="1"
+                max="25"
+                step="1"
+                value={radiusKm}
+                onChange={(e) => setRadiusKm(Number(e.target.value))}
+                style={{
+                  cursor: "pointer",
+                  width: "100px",
+                  accentColor: "#2563eb",
+                }}
+                title="Slide to adjust discovery radius"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Categories Bar & Quick Emergency Mode Indicator */}
@@ -481,6 +579,104 @@ export default function HomePage() {
               </button>
             </div>
           )}
+        </div>
+
+        {/* Prominent Search Action Bar with Radius Context & Real-Time Loading */}
+        <div
+          style={{
+            marginTop: "16px",
+            paddingTop: "14px",
+            borderTop: "1px dashed #e2e8f0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "12px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "14px", color: "#475569" }}>
+              Ready to scan:{" "}
+              <strong style={{ color: "#0f172a" }}>
+                {category !== "All" ? `${category}s` : "All Medical Facilities"}
+              </strong>{" "}
+              within{" "}
+              <strong style={{ color: "#2563eb" }}>{radiusKm} km</strong>
+              {coordinates ? (
+                <span
+                  style={{
+                    backgroundColor: "#dcfce7",
+                    color: "#15803d",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    padding: "2px 8px",
+                    borderRadius: "12px",
+                    marginLeft: "8px",
+                  }}
+                >
+                  ✓ Point A Set
+                </span>
+              ) : (
+                <span
+                  style={{
+                    backgroundColor: "#fef3c7",
+                    color: "#b45309",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    padding: "2px 8px",
+                    borderRadius: "12px",
+                    marginLeft: "8px",
+                  }}
+                >
+                  ⚠️ Set Point A to Rank
+                </span>
+              )}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleManualSearch}
+            disabled={loading}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              padding: "10px 24px",
+              backgroundColor: "#2563eb",
+              color: "#ffffff",
+              borderRadius: "10px",
+              fontSize: "14px",
+              fontWeight: 700,
+              border: "none",
+              cursor: loading ? "not-allowed" : "pointer",
+              boxShadow: "0 4px 14px rgba(37, 99, 235, 0.35)",
+              transition: "all 0.15s ease",
+            }}
+          >
+            {loading ? (
+              <>
+                <div
+                  style={{
+                    width: "16px",
+                    height: "16px",
+                    border: "2px solid #ffffff",
+                    borderTopColor: "transparent",
+                    borderRadius: "50%",
+                    animation: "rrSpin 0.8s linear infinite",
+                  }}
+                />
+                <span>Searching Facilities in {radiusKm} km Circle...</span>
+              </>
+            ) : (
+              <>
+                <span style={{ fontSize: "16px" }}>🔍</span>
+                <span>
+                  Search {category !== "All" ? `${category}s` : "Facilities"} ({radiusKm} km)
+                </span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
@@ -551,27 +747,61 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Main Content Area: Split View */}
-      {loading ? (
-        <Loading message="Computing distances and priority rankings..." />
-      ) : (
+      {/* Main Content Area: Split View with Always-Mounted Map for Active Radar Circles */}
+      <div className="home-split-grid">
+        {/* Left Column: Facilities List & Quick Filter */}
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(360px, 440px) 1fr",
-            gap: "20px",
-            alignItems: "start",
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
           }}
         >
-          {/* Left Column: Facilities List & Quick Filter */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "12px",
-            }}
-          >
-            {/* List Header & Quick Filter */}
+          {loading ? (
+            <div
+              style={{
+                backgroundColor: "#ffffff",
+                padding: "40px 24px",
+                borderRadius: "14px",
+                border: "1px solid #e2e8f0",
+                textAlign: "center",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.04)",
+              }}
+            >
+              <div
+                style={{
+                  width: "40px",
+                  height: "40px",
+                  border: "3px solid #e2e8f0",
+                  borderTopColor: "#2563eb",
+                  borderRadius: "50%",
+                  animation: "rrSpin 0.8s linear infinite",
+                  margin: "0 auto 16px auto",
+                }}
+              />
+              <h4 style={{ margin: "0 0 6px 0", color: "#0f172a", fontSize: "16px", fontWeight: 700 }}>
+                Scanning &amp; Ranking Facilities...
+              </h4>
+              <p style={{ margin: "0 0 10px 0", fontSize: "13px", color: "#64748b", lineHeight: "1.5" }}>
+                Searching within {radiusKm} km radius circle on the map and calculating road travel times.
+              </p>
+              <span
+                style={{
+                  display: "inline-block",
+                  backgroundColor: "#eff6ff",
+                  color: "#2563eb",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  padding: "3px 10px",
+                  borderRadius: "12px",
+                }}
+              >
+                Look at the map circle for live scan area
+              </span>
+            </div>
+          ) : (
+            <>
+              {/* List Header & Quick Filter */}
             <div
               style={{
                 backgroundColor: "#ffffff",
@@ -750,7 +980,9 @@ export default function HomePage() {
                                 ? "#fef2f2"
                                 : facility.type === "Pharmacy"
                                 ? "#f0fdf4"
-                                : "#fffbeb",
+                                : facility.type === "Ambulance"
+                                ? "#fffbeb"
+                                : "#ecfeff",
                             color:
                               facility.type === "Hospital"
                                 ? "#1d4ed8"
@@ -758,7 +990,9 @@ export default function HomePage() {
                                 ? "#b91c1c"
                                 : facility.type === "Pharmacy"
                                 ? "#15803d"
-                                : "#b45309",
+                                : facility.type === "Ambulance"
+                                ? "#b45309"
+                                : "#0891b2",
                           }}
                         >
                           {facility.type}
@@ -837,20 +1071,23 @@ export default function HomePage() {
                 </div>
               )}
             </div>
-          </div>
-
-          {/* Right Column: Google Maps Style Leaflet Map */}
-          <div>
-            <MapView
-              facilities={mapFacilities}
-              userLocation={coordinates}
-              selectedFacilityId={selectedFacilityId}
-              route={route}
-              height="720px"
-            />
-          </div>
+            </>
+          )}
         </div>
-      )}
+
+        {/* Right Column: Google Maps Style Leaflet Map with Active Scanning Radar */}
+        <div>
+          <MapView
+            facilities={mapFacilities}
+            userLocation={coordinates}
+            radiusKm={radiusKm}
+            selectedFacilityId={selectedFacilityId}
+            route={route}
+            height="720px"
+            isSearching={loading}
+          />
+        </div>
+      </div>
     </div>
   );
 }

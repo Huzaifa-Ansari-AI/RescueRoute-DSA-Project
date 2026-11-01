@@ -37,7 +37,11 @@ VALUES
     -- 8. Edhi Ambulance Service (Ambulance)
     ('d0000001-0000-0000-0000-000000000001', 'Edhi Ambulance Service - Central', 'Ambulance', 'Boulton Market, M.A. Jinnah Road, Karachi', 'Karachi', 24.8646, 67.0165, '115', TRUE, TRUE, '22222222-2222-2222-2222-222222222222', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     -- 9. Chhipa Ambulance Service (Ambulance)
-    ('d0000001-0000-0000-0000-000000000002', 'Chhipa Ambulance HQ', 'Ambulance', 'FTC Flyover, Shahrah-e-Faisal, Karachi', 'Karachi', 24.8601, 67.0512, '1020', TRUE, TRUE, '22222222-2222-2222-2222-222222222222', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    ('d0000001-0000-0000-0000-000000000002', 'Chhipa Ambulance HQ', 'Ambulance', 'FTC Flyover, Shahrah-e-Faisal, Karachi', 'Karachi', 24.8601, 67.0512, '1020', TRUE, TRUE, '22222222-2222-2222-2222-222222222222', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    -- 10. Al-Khidmat Diagnostic Center & Clinic (Clinic)
+    ('e0000001-0000-0000-0000-000000000001', 'Al-Khidmat Diagnostic Center & Clinic', 'Clinic', 'Gulshan-e-Iqbal Block 6, Karachi', 'Karachi', 24.9180, 67.0971, '+92-21-34988888', TRUE, TRUE, '22222222-2222-2222-2222-222222222222', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    -- 11. Dow Family Healthcare Clinic (Clinic)
+    ('e0000001-0000-0000-0000-000000000002', 'Dow Family Healthcare Clinic', 'Clinic', 'Ojha Campus, University Road, Karachi', 'Karachi', 24.9462, 67.1152, '+92-21-99232660', TRUE, TRUE, '22222222-2222-2222-2222-222222222222', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT (id) DO NOTHING;
 
 -- -----------------------------------------------------------------------------
@@ -76,3 +80,13 @@ VALUES
     (gen_random_uuid(), 'd0000001-0000-0000-0000-000000000001', TRUE, 8, 'South Karachi, Saddar, Lyari', TRUE, 'Equipped with portable ventilators and oxygen support.'),
     (gen_random_uuid(), 'd0000001-0000-0000-0000-000000000002', TRUE, 10, 'Shahrah-e-Faisal, PECHS, Gulshan', TRUE, 'Rapid response emergency rescue fleet.')
 ON CONFLICT (facility_id) DO NOTHING;
+
+-- -----------------------------------------------------------------------------
+-- Clinics Subtype Details
+-- -----------------------------------------------------------------------------
+INSERT INTO clinics (id, facility_id, consultation_available, specialties, open_weekends, notes)
+VALUES
+    (gen_random_uuid(), 'e0000001-0000-0000-0000-000000000001', TRUE, 'General Physician, Pediatrics, Dental, Diagnostics', TRUE, 'Subsidized community healthcare clinic with weekend OPD.'),
+    (gen_random_uuid(), 'e0000001-0000-0000-0000-000000000002', TRUE, 'Family Medicine, Dermatology, Pathology Lab', FALSE, 'Outpatient academic health clinic affiliated with Dow University.')
+ON CONFLICT (facility_id) DO NOTHING;
+

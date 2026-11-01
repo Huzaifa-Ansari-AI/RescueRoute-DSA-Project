@@ -21,8 +21,8 @@ public class CreateFacilityRequestDto {
     private String name;
 
     @NotBlank(message = "Facility type is required")
-    @Pattern(regexp = "^(Hospital|Blood Bank|Pharmacy|Ambulance)$",
-            message = "Facility type must be one of: Hospital, Blood Bank, Pharmacy, Ambulance")
+    @Pattern(regexp = "^(Hospital|Blood Bank|Pharmacy|Ambulance|Clinic)$",
+            message = "Facility type must be one of: Hospital, Blood Bank, Pharmacy, Ambulance, Clinic")
     private String facilityType;
 
     @NotBlank(message = "Address is required")
@@ -49,4 +49,5 @@ public class CreateFacilityRequestDto {
     private BloodBankDetailsDto bloodBankDetails;
     private PharmacyDetailsDto pharmacyDetails;
     private AmbulanceDetailsDto ambulanceDetails;
+    private ClinicDetailsDto clinicDetails;
 }

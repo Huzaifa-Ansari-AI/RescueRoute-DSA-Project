@@ -67,7 +67,7 @@ public final class TopKRankingEngine {
     /**
      * Comparator for final result sorting: Highest score first, lowest distance first.
      */
-    private static final Comparator<RankedFacilityResponseDto> BEST_FIRST_COMPARATOR = (a, b) -> {
+    public static final Comparator<RankedFacilityResponseDto> BEST_FIRST_COMPARATOR = (a, b) -> {
         // 1. Score descending (higher score is better)
         int scoreCompare = Double.compare(b.getScore(), a.getScore());
         if (scoreCompare != 0) {
@@ -88,6 +88,87 @@ public final class TopKRankingEngine {
 
         return idA.compareTo(idB);
     };
+
+    /**
+     * Comparator for Road-network best-first sorting:
+     * 1. Higher score is better (descending).
+     * 1. Lower driving travel time (estimatedTravelMinutes) is better (ascending, nulls last).
+     * 2. Lower driving distance (drivingDistanceKm) is better (ascending, nulls last).
+     * 3. Higher score is better (descending).
+     * 4. Lower straight-line distance (distanceKm) is better (ascending).
+     * 5. Deterministic tie-breaker using Facility ID ascending.
+     */
+    public static final Comparator<RankedFacilityResponseDto> ROAD_BEST_FIRST_COMPARATOR = (a, b) -> {
+        // 1. Driving travel time ascending (nulls last) - lowest ETA gets top rank
+        Integer durA = a.getEstimatedTravelMinutes();
+        Integer durB = b.getEstimatedTravelMinutes();
+        if (durA != null || durB != null) {
+            if (durA == null) return 1;
+            if (durB == null) return -1;
+            int durCompare = Integer.compare(durA, durB);
+            if (durCompare != 0) {
+                return durCompare;
+            }
+        }
+
+        // 2. Driving distance ascending (nulls last)
+        Double driveA = a.getDrivingDistanceKm();
+        Double driveB = b.getDrivingDistanceKm();
+        if (driveA != null || driveB != null) {
+            if (driveA == null) return 1;
+            if (driveB == null) return -1;
+            int driveCompare = Double.compare(driveA, driveB);
+            if (driveCompare != 0) {
+                return driveCompare;
+            }
+        }
+
+        // 3. Score descending (if travel times and driving distances are identical)
+        int scoreCompare = Double.compare(b.getScore(), a.getScore());
+        if (scoreCompare != 0) {
+            return scoreCompare;
+        }
+
+        // 4. Straight-line distance ascending
+        int distCompare = Double.compare(a.getDistanceKm(), b.getDistanceKm());
+        if (distCompare != 0) {
+            return distCompare;
+        }
+
+        // 5. Facility ID ascending
+        String idA = a.getFacility() != null && a.getFacility().getId() != null
+                ? a.getFacility().getId().toString() : "";
+        String idB = b.getFacility() != null && b.getFacility().getId() != null
+                ? b.getFacility().getId().toString() : "";
+
+        return idA.compareTo(idB);
+    };
+
+    /**
+     * Orders road-network evaluated candidates best-first, truncates to top K,
+     * and assigns sequential 1-based ranks.
+     *
+     * @param candidates Candidates with road metrics evaluated
+     * @param k          Maximum number of results to return
+     * @return Ordered and ranked list of top K facilities
+     */
+    public static List<RankedFacilityResponseDto> rankRoadCandidates(List<RankedFacilityResponseDto> candidates, int k) {
+        if (candidates == null || candidates.isEmpty() || k <= 0) {
+            return Collections.emptyList();
+        }
+
+        List<RankedFacilityResponseDto> sorted = new ArrayList<>(candidates);
+        sorted.sort(ROAD_BEST_FIRST_COMPARATOR);
+
+        int targetK = Math.min(k, sorted.size());
+        List<RankedFacilityResponseDto> topK = new ArrayList<>(sorted.subList(0, targetK));
+
+        for (int i = 0; i < topK.size(); i++) {
+            topK.get(i).setRank(i + 1);
+        }
+
+        return topK;
+    }
 
     /**
      * Selects and orders the top K facilities from a candidate list using a bounded Min-Heap.

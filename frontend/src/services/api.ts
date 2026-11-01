@@ -5,7 +5,7 @@ const TOKEN_KEY = "rescueroute_token";
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
-  timeout: 10000,
+  timeout: 150000, // 2.5 minutes to allow complex Overpass geographic queries
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -32,6 +32,8 @@ apiClient.interceptors.response.use(
 
     if (error.response?.data?.message) {
       message = error.response.data.message;
+    } else if (error.code === "ECONNABORTED" || error.message?.toLowerCase().includes("timeout")) {
+      message = "Request timed out waiting for server response. Please retry in a moment.";
     } else if (error.message) {
       message = error.message;
     }

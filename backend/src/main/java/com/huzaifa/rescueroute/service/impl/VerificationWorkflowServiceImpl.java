@@ -28,6 +28,7 @@ public class VerificationWorkflowServiceImpl implements VerificationWorkflowServ
     private final AdminLogRepository adminLogRepository;
     private final UserRepository userRepository;
     private final FacilityMapper facilityMapper;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     public VerificationWorkflowServiceImpl(
             FacilityRepository facilityRepository,
@@ -35,11 +36,24 @@ public class VerificationWorkflowServiceImpl implements VerificationWorkflowServ
             AdminLogRepository adminLogRepository,
             UserRepository userRepository,
             FacilityMapper facilityMapper) {
+        this(facilityRepository, verificationRequestRepository, adminLogRepository,
+             userRepository, facilityMapper, new com.fasterxml.jackson.databind.ObjectMapper());
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public VerificationWorkflowServiceImpl(
+            FacilityRepository facilityRepository,
+            VerificationRequestRepository verificationRequestRepository,
+            AdminLogRepository adminLogRepository,
+            UserRepository userRepository,
+            FacilityMapper facilityMapper,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
         this.facilityRepository = facilityRepository;
         this.verificationRequestRepository = verificationRequestRepository;
         this.adminLogRepository = adminLogRepository;
         this.userRepository = userRepository;
         this.facilityMapper = facilityMapper;
+        this.objectMapper = objectMapper != null ? objectMapper : new com.fasterxml.jackson.databind.ObjectMapper();
     }
 
     @Override
@@ -88,6 +102,62 @@ public class VerificationWorkflowServiceImpl implements VerificationWorkflowServ
         verificationRequestRepository.save(verificationRequest);
 
         return facilityMapper.toDto(savedFacility);
+    }
+
+    @Override
+    @Transactional
+    public FacilityResponseDto submitFacilityUpdate(UUID facilityId, UpdateFacilityRequestDto request, String providerEmail) {
+        Facility facility = facilityRepository.findById(facilityId)
+                .orElseThrow(() -> new ResourceNotFoundException("Facility not found with ID: " + facilityId));
+
+        if (!facility.isActive()) {
+            throw new IllegalStateException("Cannot update a deactivated facility. Please contact administrator to restore it.");
+        }
+
+        User caller = userRepository.findByEmail(providerEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + providerEmail));
+
+        boolean isAdmin = caller.getRole() == UserRole.ADMIN;
+        boolean isOwner = facility.getCreatedBy() != null && facility.getCreatedBy().getId().equals(caller.getId());
+
+        if (!isAdmin && !isOwner) {
+            throw new AccessDeniedException("Unauthorized: You can only edit facilities that you own");
+        }
+
+        // Check if there is already a PENDING verification request
+        List<VerificationRequest> pending = verificationRequestRepository.findByFacilityIdAndStatus(facilityId, "PENDING");
+        if (!pending.isEmpty() || facility.isHasPendingUpdate()) {
+            throw new IllegalStateException("A pending verification request is already under review for this facility");
+        }
+
+        // Validate coordinates
+        HaversineUtil.validateCoordinate(request.getLatitude(), request.getLongitude(), "Facility");
+
+        // Serialize proposed changes to JSON
+        String proposedChangesJson;
+        try {
+            proposedChangesJson = objectMapper.writeValueAsString(request);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to serialize proposed facility changes", e);
+        }
+
+        // Create PENDING verification request of type UPDATE
+        VerificationRequest vr = VerificationRequest.builder()
+                .facility(facility)
+                .submittedBy(caller)
+                .status("PENDING")
+                .requestType("UPDATE")
+                .proposedChanges(proposedChangesJson)
+                .submittedAt(Instant.now())
+                .build();
+        verificationRequestRepository.save(vr);
+
+        // Mark facility hasPendingUpdate = true while leaving live data untouched
+        facility.setHasPendingUpdate(true);
+        facility.setUpdatedAt(Instant.now());
+        Facility saved = facilityRepository.save(facility);
+
+        return facilityMapper.toDto(saved);
     }
 
     @Override
@@ -151,11 +221,30 @@ public class VerificationWorkflowServiceImpl implements VerificationWorkflowServ
 
         // 1. Update associated facility
         Facility facility = verificationRequest.getFacility();
-        if ("APPROVED".equals(resolvedDecision)) {
-            facility.setVerified(true);
+        String requestType = verificationRequest.getRequestType() != null ? verificationRequest.getRequestType() : "CREATION";
+        String actionType;
+
+        if ("UPDATE".equalsIgnoreCase(requestType)) {
+            if ("APPROVED".equals(resolvedDecision)) {
+                applyProposedChanges(facility, verificationRequest.getProposedChanges());
+                facility.setVerified(true);
+                facility.setHasPendingUpdate(false);
+                actionType = "FACILITY_UPDATE_APPROVED";
+            } else {
+                facility.setHasPendingUpdate(false);
+                actionType = "FACILITY_UPDATE_REJECTED";
+            }
         } else {
-            facility.setVerified(false);
+            if ("APPROVED".equals(resolvedDecision)) {
+                facility.setVerified(true);
+                actionType = "VERIFICATION_APPROVED";
+            } else {
+                facility.setVerified(false);
+                actionType = "VERIFICATION_REJECTED";
+            }
+            facility.setHasPendingUpdate(false);
         }
+
         facility.setUpdatedAt(Instant.now());
         facilityRepository.save(facility);
 
@@ -169,11 +258,12 @@ public class VerificationWorkflowServiceImpl implements VerificationWorkflowServ
         // 3. Record immutable admin audit log within same transaction
         AdminLog log = AdminLog.builder()
                 .admin(adminUser)
-                .actionType("VERIFICATION_" + resolvedDecision)
+                .actionType(actionType)
                 .targetEntityType("FACILITY")
                 .targetEntityId(facility.getId())
-                .details(String.format("Admin '%s' %s facility '%s' (%s). Notes: %s",
+                .details(String.format("Admin '%s' processed %s request as %s for facility '%s' (%s). Notes: %s",
                         adminUser.getEmail(),
+                        requestType,
                         resolvedDecision.toLowerCase(),
                         facility.getName(),
                         facility.getId(),
@@ -239,8 +329,107 @@ public class VerificationWorkflowServiceImpl implements VerificationWorkflowServ
                     .notes(a != null ? a.getNotes() : null)
                     .build();
             facility.setAmbulance(ambulance);
+        } else if ("Clinic".equalsIgnoreCase(type)) {
+            ClinicDetailsDto c = request.getClinicDetails();
+            Clinic clinic = Clinic.builder()
+                    .facility(facility)
+                    .consultationAvailable(c == null || c.isConsultationAvailable())
+                    .specialties(c != null ? c.getSpecialties() : null)
+                    .openWeekends(c != null && c.isOpenWeekends())
+                    .notes(c != null ? c.getNotes() : null)
+                    .build();
+            facility.setClinic(clinic);
         } else {
             throw new IllegalArgumentException("Unsupported facility type: " + type);
+        }
+    }
+
+    private void applyProposedChanges(Facility facility, String proposedChangesJson) {
+        if (proposedChangesJson == null || proposedChangesJson.trim().isEmpty()) {
+            return;
+        }
+
+        UpdateFacilityRequestDto changes;
+        try {
+            changes = objectMapper.readValue(proposedChangesJson, UpdateFacilityRequestDto.class);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to deserialize proposed facility changes", e);
+        }
+
+        facility.setName(changes.getName().trim());
+        facility.setAddress(changes.getAddress().trim());
+        facility.setCity(changes.getCity() != null ? changes.getCity().trim() : "Karachi");
+        facility.setLatitude(changes.getLatitude());
+        facility.setLongitude(changes.getLongitude());
+        facility.setPhoneNumber(changes.getPhoneNumber() != null ? changes.getPhoneNumber().trim() : null);
+
+        String type = facility.getFacilityType();
+        if ("Hospital".equalsIgnoreCase(type) && changes.getHospitalDetails() != null) {
+            Hospital h = facility.getHospital();
+            HospitalDetailsDto dto = changes.getHospitalDetails();
+            if (h == null) {
+                h = Hospital.builder().facility(facility).build();
+                facility.setHospital(h);
+            }
+            h.setEmergencyAvailable(dto.isEmergencyAvailable());
+            h.setIcuAvailable(dto.isIcuAvailable());
+            h.setTraumaCenterAvailable(dto.isTraumaCenterAvailable());
+            h.setCardiologyAvailable(dto.isCardiologyAvailable());
+            h.setPediatricsAvailable(dto.isPediatricsAvailable());
+            h.setMaternityAvailable(dto.isMaternityAvailable());
+            h.setNotes(dto.getNotes());
+        } else if ("Blood Bank".equalsIgnoreCase(type) && changes.getBloodBankDetails() != null) {
+            BloodBank b = facility.getBloodBank();
+            BloodBankDetailsDto dto = changes.getBloodBankDetails();
+            if (b == null) {
+                b = BloodBank.builder().facility(facility).build();
+                facility.setBloodBank(b);
+            }
+            b.setOPositive(dto.isOPositive());
+            b.setONegative(dto.isONegative());
+            b.setAPositive(dto.isAPositive());
+            b.setANegative(dto.isANegative());
+            b.setBPositive(dto.isBPositive());
+            b.setBNegative(dto.isBNegative());
+            b.setAbPositive(dto.isAbPositive());
+            b.setAbNegative(dto.isAbNegative());
+            b.setStockUpdatedAt(dto.getStockUpdatedAt());
+            b.setNotes(dto.getNotes());
+        } else if ("Pharmacy".equalsIgnoreCase(type) && changes.getPharmacyDetails() != null) {
+            Pharmacy p = facility.getPharmacy();
+            PharmacyDetailsDto dto = changes.getPharmacyDetails();
+            if (p == null) {
+                p = Pharmacy.builder().facility(facility).build();
+                facility.setPharmacy(p);
+            }
+            p.setOpen24Hours(dto.isOpen24Hours());
+            p.setEmergencyMedicinesAvailable(dto.isEmergencyMedicinesAvailable());
+            p.setPrescriptionRequired(dto.isPrescriptionRequired());
+            p.setDeliveryAvailable(dto.isDeliveryAvailable());
+            p.setNotes(dto.getNotes());
+        } else if ("Ambulance".equalsIgnoreCase(type) && changes.getAmbulanceDetails() != null) {
+            Ambulance a = facility.getAmbulance();
+            AmbulanceDetailsDto dto = changes.getAmbulanceDetails();
+            if (a == null) {
+                a = Ambulance.builder().facility(facility).build();
+                facility.setAmbulance(a);
+            }
+            a.setAvailableNow(dto.isAvailableNow());
+            a.setResponseTimeMinutes(dto.getResponseTimeMinutes() != null ? dto.getResponseTimeMinutes() : 15);
+            a.setCoverageArea(dto.getCoverageArea() != null ? dto.getCoverageArea() : "Karachi Central");
+            a.setEquippedForIcuTransfer(dto.isEquippedForIcuTransfer());
+            a.setNotes(dto.getNotes());
+        } else if ("Clinic".equalsIgnoreCase(type) && changes.getClinicDetails() != null) {
+            Clinic c = facility.getClinic();
+            ClinicDetailsDto dto = changes.getClinicDetails();
+            if (c == null) {
+                c = Clinic.builder().facility(facility).build();
+                facility.setClinic(c);
+            }
+            c.setConsultationAvailable(dto.isConsultationAvailable());
+            c.setSpecialties(dto.getSpecialties());
+            c.setOpenWeekends(dto.isOpenWeekends());
+            c.setNotes(dto.getNotes());
         }
     }
 
@@ -271,6 +460,14 @@ public class VerificationWorkflowServiceImpl implements VerificationWorkflowServ
                 .createdAt(reviewer.getCreatedAt())
                 .build() : null;
 
+        UpdateFacilityRequestDto parsedChanges = null;
+        if (request.getProposedChanges() != null && !request.getProposedChanges().trim().isEmpty()) {
+            try {
+                parsedChanges = objectMapper.readValue(request.getProposedChanges(), UpdateFacilityRequestDto.class);
+            } catch (Exception ignored) {
+            }
+        }
+
         return VerificationRequestResponseDto.builder()
                 .id(request.getId())
                 .facilityId(facility != null ? facility.getId() : null)
@@ -282,8 +479,13 @@ public class VerificationWorkflowServiceImpl implements VerificationWorkflowServ
                 .facilityLongitude(facility != null ? facility.getLongitude() : null)
                 .facilityPhoneNumber(facility != null ? facility.getPhoneNumber() : null)
                 .facilityVerified(facility != null && facility.isVerified())
+                .facilityActive(facility != null ? facility.isActive() : null)
+                .facilityDeletedAt(facility != null ? facility.getDeletedAt() : null)
+                .facilityHasPendingUpdate(facility != null ? facility.isHasPendingUpdate() : null)
                 .submittedBy(submitterDto)
                 .status(request.getStatus())
+                .requestType(request.getRequestType() != null ? request.getRequestType() : "CREATION")
+                .proposedChanges(parsedChanges)
                 .reviewedBy(reviewerDto)
                 .reviewNotes(request.getReviewNotes())
                 .submittedAt(request.getSubmittedAt())

@@ -12,6 +12,8 @@ interface LocationSearchInputProps {
   onClearLocation: () => void;
   emergencyMode: boolean;
   onToggleEmergency: (emergency: boolean) => void;
+  onSearch?: () => void;
+  isSearchingFacilities?: boolean;
 }
 
 export const LocationSearchInput: React.FC<LocationSearchInputProps> = ({
@@ -24,6 +26,8 @@ export const LocationSearchInput: React.FC<LocationSearchInputProps> = ({
   onClearLocation,
   emergencyMode,
   onToggleEmergency,
+  onSearch,
+  isSearchingFacilities,
 }) => {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
@@ -229,7 +233,50 @@ export const LocationSearchInput: React.FC<LocationSearchInputProps> = ({
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "8px" }}>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            {onSearch && (
+              <button
+                type="button"
+                onClick={onSearch}
+                disabled={isSearchingFacilities}
+                style={{
+                  backgroundColor: "#2563eb",
+                  color: "#ffffff",
+                  border: "1px solid #1d4ed8",
+                  padding: "6px 16px",
+                  borderRadius: "6px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  cursor: isSearchingFacilities ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  boxShadow: "0 2px 6px rgba(37, 99, 235, 0.35)",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                {isSearchingFacilities ? (
+                  <>
+                    <div
+                      style={{
+                        width: "12px",
+                        height: "12px",
+                        border: "2px solid #ffffff",
+                        borderTopColor: "transparent",
+                        borderRadius: "50%",
+                        animation: "rrSpin 0.8s linear infinite",
+                      }}
+                    />
+                    <span>Searching...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🔍</span>
+                    <span>Search</span>
+                  </>
+                )}
+              </button>
+            )}
             <button
               type="button"
               onClick={onRequestGps}
@@ -372,6 +419,57 @@ export const LocationSearchInput: React.FC<LocationSearchInputProps> = ({
                 </ul>
               )}
             </div>
+
+            {/* Search Button */}
+            {onSearch && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (query.trim() && suggestions.length > 0) {
+                    handleSelectSuggestion(suggestions[0]);
+                  } else if (onSearch) {
+                    onSearch();
+                  }
+                }}
+                disabled={isSearchingFacilities}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "0 18px",
+                  backgroundColor: "#2563eb",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  cursor: isSearchingFacilities ? "not-allowed" : "pointer",
+                  whiteSpace: "nowrap",
+                  boxShadow: "0 2px 4px rgba(37, 99, 235, 0.25)",
+                }}
+              >
+                {isSearchingFacilities ? (
+                  <>
+                    <div
+                      style={{
+                        width: "12px",
+                        height: "12px",
+                        border: "2px solid #ffffff",
+                        borderTopColor: "transparent",
+                        borderRadius: "50%",
+                        animation: "rrSpin 0.8s linear infinite",
+                      }}
+                    />
+                    <span>Searching...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🔍</span>
+                    <span>Search</span>
+                  </>
+                )}
+              </button>
+            )}
 
             {/* GPS Detection Button */}
             <button

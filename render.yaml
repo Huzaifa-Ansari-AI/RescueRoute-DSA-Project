@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: rescueroute-backend
+    runtime: java
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: chmod +x ./mvnw && ./mvnw clean package -DskipTests
+    startCommand: java -Dspring.profiles.active=prod -jar target/rescueroute-0.0.1-SNAPSHOT.jar
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://rescueroute.vercel.app,http://localhost:5173
+      - key: OSRM_BASE_URL
+        value: https://router.project-osrm.org
+      - key: OVERPASS_API_URL
+        value: https://overpass-api.de/api/interpreter

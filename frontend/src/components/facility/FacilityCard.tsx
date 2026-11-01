@@ -15,6 +15,8 @@ export default function FacilityCard({ facility }: FacilityCardProps) {
         return { bg: "#f0fdf4", text: "#15803d", border: "#bbf7d0" };
       case "Ambulance":
         return { bg: "#fffbeb", text: "#b45309", border: "#fde68a" };
+      case "Clinic":
+        return { bg: "#ecfeff", text: "#0891b2", border: "#a5f3fc" };
       default:
         return { bg: "#f1f5f9", text: "#475569", border: "#cbd5e1" };
     }
@@ -265,6 +267,37 @@ export default function FacilityCard({ facility }: FacilityCardProps) {
             {facility.ambulanceDetails.coverageArea && (
               <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: "12px" }}>
                 <strong>Coverage:</strong> {facility.ambulanceDetails.coverageArea}
+              </p>
+            )}
+          </div>
+        )}
+
+        {facility.clinicDetails && (
+          <div
+            style={{
+              borderTop: "1px solid #f1f5f9",
+              paddingTop: "12px",
+              marginTop: "12px",
+              fontSize: "13px",
+              color: "#334155",
+            }}
+          >
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
+              {facility.clinicDetails.consultationAvailable && (
+                <span style={tagStyle("#ecfeff", "#0891b2")}>🩺 Consultation Available</span>
+              )}
+              {facility.clinicDetails.openWeekends && (
+                <span style={tagStyle("#dcfce7", "#166534")}>📅 Open Weekends</span>
+              )}
+              {facility.clinicDetails.specialties && (
+                <span style={tagStyle("#f3e8ff", "#6b21a8")}>
+                  {facility.clinicDetails.specialties}
+                </span>
+              )}
+            </div>
+            {facility.clinicDetails.notes && (
+              <p style={{ margin: "6px 0 0 0", color: "#64748b", fontStyle: "italic" }}>
+                {facility.clinicDetails.notes}
               </p>
             )}
           </div>

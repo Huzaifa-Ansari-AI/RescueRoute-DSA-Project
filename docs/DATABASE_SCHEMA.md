@@ -57,6 +57,7 @@ Stores shared data for every medical resource.
 - Blood Bank
 - Pharmacy
 - Ambulance
+- Clinic
 
 ---
 
@@ -123,7 +124,20 @@ Stores ambulance-specific details.
 
 ---
 
-### 7. verification_requests
+### 7. clinics
+Stores clinic-specific details (outpatient consultations & diagnostic centers).
+
+**Main fields**
+- id
+- facility_id
+- consultation_available
+- specialties
+- open_weekends
+- notes
+
+---
+
+### 8. verification_requests
 Tracks provider verification requests.
 
 **Main fields**
@@ -143,7 +157,7 @@ Tracks provider verification requests.
 
 ---
 
-### 8. admin_logs
+### 9. admin_logs
 Tracks important admin actions.
 
 **Main fields**
@@ -157,7 +171,7 @@ Tracks important admin actions.
 
 ---
 
-### 9. routes
+### 10. routes
 Stores route results if route history is saved.
 
 **Main fields**
@@ -170,6 +184,42 @@ Stores route results if route history is saved.
 - route_polyline
 - emergency_type
 - calculated_at
+
+---
+
+### 11. external_facilities (Phase 4: OpenStreetMap / Overpass Integration)
+Stores crowd-sourced medical points of interest discovered externally via the Overpass API. Kept completely separate from trusted internal `facilities` to prevent clinical conflation.
+
+**Main fields**
+- id (UUID PK)
+- source (VARCHAR(50), default 'OPENSTREETMAP')
+- osm_element_type (VARCHAR(20), 'node', 'way', 'relation')
+- osm_element_id (BIGINT)
+- source_url (TEXT)
+- name (VARCHAR(255))
+- facility_type (VARCHAR(50): Hospital, Clinic, Pharmacy, Blood Bank, Ambulance)
+- osm_tags (TEXT, JSON string of raw tags)
+- latitude (DOUBLE PRECISION)
+- longitude (DOUBLE PRECISION)
+- address (TEXT)
+- city (VARCHAR(100), default 'Karachi')
+- phone_number (VARCHAR(100))
+- website (TEXT)
+- opening_hours (TEXT)
+- import_status (VARCHAR(50): DISCOVERED, DUPLICATE_CANDIDATE, REVIEWED, SUPPRESSED)
+- matched_facility_id (UUID FK -> facilities(id) ON DELETE SET NULL)
+- imported_at (TIMESTAMP WITH TIME ZONE)
+- last_seen_at (TIMESTAMP WITH TIME ZONE)
+- created_at (TIMESTAMP WITH TIME ZONE)
+- updated_at (TIMESTAMP WITH TIME ZONE)
+
+**Constraints & Indexes**
+- UNIQUE (source, osm_element_type, osm_element_id)
+- INDEX idx_ext_facilities_source_osm (source, osm_element_type, osm_element_id)
+- INDEX idx_ext_facilities_status (import_status)
+- INDEX idx_ext_facilities_type (facility_type)
+- INDEX idx_ext_facilities_coords (latitude, longitude)
+- INDEX idx_ext_facilities_matched_facility (matched_facility_id)
 
 ---
 

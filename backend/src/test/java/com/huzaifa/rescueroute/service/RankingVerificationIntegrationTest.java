@@ -1,5 +1,6 @@
 package com.huzaifa.rescueroute.service;
 
+import com.huzaifa.rescueroute.client.OsrmRoutingClient;
 import com.huzaifa.rescueroute.dto.RankedFacilityResponseDto;
 import com.huzaifa.rescueroute.entity.Facility;
 import com.huzaifa.rescueroute.entity.Hospital;
@@ -45,6 +46,12 @@ public class RankingVerificationIntegrationTest {
 
     @Mock
     private AmbulanceRepository ambulanceRepository;
+
+    @Mock
+    private ClinicRepository clinicRepository;
+
+    @Mock
+    private OsrmRoutingClient osrmRoutingClient;
 
     @Spy
     private FacilityMapper facilityMapper = new FacilityMapper();
@@ -102,10 +109,10 @@ public class RankingVerificationIntegrationTest {
         double verifiedScore = verifiedRankings.get(0).getScore();
         assertTrue(verifiedRankings.get(0).isVerified());
 
-        // 3. Confirm ranking engine assigns higher score to verified facility
-        assertTrue(verifiedScore > unverifiedScore,
-                "Approved facility must receive higher ranking score (" + verifiedScore + " > " + unverifiedScore + ")");
-        assertEquals(0.25, Math.round((verifiedScore - unverifiedScore) * 100.0) / 100.0,
-                "Difference must correspond to verification weight (0.25)");
+        // 3. Confirm ranking DTO accurately reflects isVerified attribute while score remains unbiased
+        assertEquals(unverifiedScore, verifiedScore, 0.0001,
+                "Verification status must be an informational attribute and not artificially inflate distance/time score");
+        assertTrue(verifiedRankings.get(0).isVerified());
+        assertFalse(unverifiedRankings.get(0).isVerified());
     }
 }

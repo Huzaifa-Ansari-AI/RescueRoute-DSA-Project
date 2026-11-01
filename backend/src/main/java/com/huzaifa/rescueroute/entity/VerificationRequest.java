@@ -34,6 +34,13 @@ public class VerificationRequest {
     @Builder.Default
     private String status = "PENDING"; // PENDING, APPROVED, REJECTED
 
+    @Column(name = "request_type", nullable = false, length = 50)
+    @Builder.Default
+    private String requestType = "CREATION"; // CREATION, UPDATE
+
+    @Column(name = "proposed_changes", columnDefinition = "TEXT")
+    private String proposedChanges;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reviewed_by")
     private User reviewedBy;

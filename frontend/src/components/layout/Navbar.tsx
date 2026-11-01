@@ -6,6 +6,11 @@ export const Navbar: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+
+  const handleLinkClick = () => {
+    setMobileMenuOpen(false);
+  };
 
   const handleLogout = () => {
     logout();
@@ -27,6 +32,7 @@ export const Navbar: React.FC = () => {
   const navLinks = [
     { label: "Find Facilities", path: "/" },
     { label: "Hospitals", path: "/hospitals" },
+    { label: "Clinics", path: "/clinics" },
     { label: "Pharmacies", path: "/pharmacies" },
     { label: "Blood Banks", path: "/blood-banks" },
     { label: "Ambulances", path: "/ambulances" },
@@ -55,25 +61,37 @@ export const Navbar: React.FC = () => {
           gap: "16px",
         }}
       >
-        {/* Brand Logo */}
-        <Link
-          to="/"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            textDecoration: "none",
-            color: "#0f172a",
-          }}
-        >
-          <span style={{ fontSize: "24px" }}>🚑</span>
-          <span style={{ fontSize: "20px", fontWeight: 700, letterSpacing: "-0.5px" }}>
-            RescueRoute
-          </span>
-        </Link>
+        {/* Left Side: Brand Logo & Mobile Toggle */}
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <button
+            type="button"
+            className="mobile-nav-toggle"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle navigation menu"
+            aria-expanded={mobileMenuOpen}
+          >
+            {mobileMenuOpen ? "✕" : "☰"}
+          </button>
 
-        {/* Navigation Categories */}
-        <nav style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+          <Link
+            to="/"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              textDecoration: "none",
+              color: "#0f172a",
+            }}
+          >
+            <span style={{ fontSize: "24px" }}>🚑</span>
+            <span style={{ fontSize: "20px", fontWeight: 700, letterSpacing: "-0.5px" }}>
+              RescueRoute
+            </span>
+          </Link>
+        </div>
+
+        {/* Desktop Navigation Categories */}
+        <nav className="desktop-nav">
           {navLinks.map((item) => {
             const isActive = location.pathname === item.path;
             return (
@@ -85,7 +103,7 @@ export const Navbar: React.FC = () => {
                   fontWeight: isActive ? 600 : 500,
                   color: isActive ? "#2563eb" : "#475569",
                   textDecoration: "none",
-                  padding: "4px 8px",
+                  padding: "5px 10px",
                   borderRadius: "6px",
                   backgroundColor: isActive ? "#eff6ff" : "transparent",
                   transition: "all 0.15s ease",
@@ -115,21 +133,38 @@ export const Navbar: React.FC = () => {
           )}
 
           {isAuthenticated && user?.role === "ADMIN" && (
-            <Link
-              to="/admin/verifications"
-              style={{
-                fontSize: "13px",
-                fontWeight: location.pathname === "/admin/verifications" ? 700 : 600,
-                color: "#7e22ce",
-                textDecoration: "none",
-                padding: "4px 10px",
-                borderRadius: "6px",
-                backgroundColor: location.pathname === "/admin/verifications" ? "#f3e8ff" : "#faf5ff",
-                border: "1px solid #e9d5ff",
-              }}
-            >
-              🛡️ Moderation Queue
-            </Link>
+            <>
+              <Link
+                to="/admin/verifications"
+                style={{
+                  fontSize: "13px",
+                  fontWeight: location.pathname === "/admin/verifications" ? 700 : 600,
+                  color: "#7e22ce",
+                  textDecoration: "none",
+                  padding: "4px 10px",
+                  borderRadius: "6px",
+                  backgroundColor: location.pathname === "/admin/verifications" ? "#f3e8ff" : "#faf5ff",
+                  border: "1px solid #e9d5ff",
+                }}
+              >
+                🛡️ Moderation Queue
+              </Link>
+              <Link
+                to="/admin/facilities"
+                style={{
+                  fontSize: "13px",
+                  fontWeight: location.pathname === "/admin/facilities" ? 700 : 600,
+                  color: "#1d4ed8",
+                  textDecoration: "none",
+                  padding: "4px 10px",
+                  borderRadius: "6px",
+                  backgroundColor: location.pathname === "/admin/facilities" ? "#dbeafe" : "#eff6ff",
+                  border: "1px solid #bfdbfe",
+                }}
+              >
+                🏥 Facility Registry
+              </Link>
+            </>
           )}
         </nav>
 
@@ -211,6 +246,89 @@ export const Navbar: React.FC = () => {
             </Link>
           )}
         </div>
+
+        {/* Mobile Nav Drawer */}
+        {mobileMenuOpen && (
+          <div className="mobile-nav-drawer">
+            {navLinks.map((item) => {
+              const isActive = location.pathname === item.path;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={handleLinkClick}
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: isActive ? 600 : 500,
+                    color: isActive ? "#2563eb" : "#334155",
+                    textDecoration: "none",
+                    padding: "8px 12px",
+                    borderRadius: "6px",
+                    backgroundColor: isActive ? "#eff6ff" : "transparent",
+                  }}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+
+            {isAuthenticated && user?.role === "PROVIDER" && (
+              <Link
+                to="/provider/create-facility"
+                onClick={handleLinkClick}
+                style={{
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  color: "#15803d",
+                  textDecoration: "none",
+                  padding: "8px 12px",
+                  borderRadius: "6px",
+                  backgroundColor: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                }}
+              >
+                ➕ Add Facility
+              </Link>
+            )}
+
+            {isAuthenticated && user?.role === "ADMIN" && (
+              <>
+                <Link
+                  to="/admin/verifications"
+                  onClick={handleLinkClick}
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    color: "#7e22ce",
+                    textDecoration: "none",
+                    padding: "8px 12px",
+                    borderRadius: "6px",
+                    backgroundColor: "#faf5ff",
+                    border: "1px solid #e9d5ff",
+                  }}
+                >
+                  🛡️ Moderation Queue
+                </Link>
+                <Link
+                  to="/admin/facilities"
+                  onClick={handleLinkClick}
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    color: "#1d4ed8",
+                    textDecoration: "none",
+                    padding: "8px 12px",
+                    borderRadius: "6px",
+                    backgroundColor: "#eff6ff",
+                    border: "1px solid #bfdbfe",
+                  }}
+                >
+                  🏥 Facility Registry
+                </Link>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </header>
   );

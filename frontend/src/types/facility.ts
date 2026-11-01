@@ -1,4 +1,4 @@
-export type FacilityType = "Hospital" | "Blood Bank" | "Pharmacy" | "Ambulance";
+export type FacilityType = "Hospital" | "Blood Bank" | "Pharmacy" | "Ambulance" | "Clinic";
 
 export interface HospitalDetails {
   id?: string;
@@ -43,6 +43,14 @@ export interface AmbulanceDetails {
   notes?: string;
 }
 
+export interface ClinicDetails {
+  id?: string;
+  consultationAvailable: boolean;
+  specialties?: string;
+  openWeekends: boolean;
+  notes?: string;
+}
+
 export interface Facility {
   id: string;
   name: string;
@@ -55,12 +63,15 @@ export interface Facility {
   phoneNumber?: string;
   isVerified?: boolean;
   isActive?: boolean;
+  hasPendingUpdate?: boolean;
+  deletedAt?: string;
   createdAt?: string;
   updatedAt?: string;
   hospitalDetails?: HospitalDetails;
   bloodBankDetails?: BloodBankDetails;
   pharmacyDetails?: PharmacyDetails;
   ambulanceDetails?: AmbulanceDetails;
+  clinicDetails?: ClinicDetails;
 }
 
 export interface FacilityFilterParams {
@@ -72,6 +83,7 @@ export interface FacilityFilterParams {
 export interface FacilitySearchParams {
   lat: number;
   lng: number;
+  radiusKm?: number;
   type?: string;
   emergency?: boolean;
   k?: number;
@@ -80,6 +92,11 @@ export interface FacilitySearchParams {
 export interface RankedFacility {
   rank: number;
   distanceKm: number;
+  straightLineDistanceKm?: number;
+  drivingDistanceKm?: number | null;
+  estimatedTravelMinutes?: number | null;
+  distanceMetricUsed?: "ROAD_NETWORK" | "STRAIGHT_LINE";
+  routingAvailable?: boolean;
   score: number;
   isVerified: boolean;
   emergencyAvailable: boolean;

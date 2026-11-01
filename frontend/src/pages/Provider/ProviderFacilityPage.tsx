@@ -1,9 +1,12 @@
 import { useState, type FormEvent, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { verificationService } from "../../services/verificationService";
+import { facilityService } from "../../services/facilityService";
 import geocodingService, { type PlaceSuggestion } from "../../services/geocodingService";
-import type { FacilityType } from "../../types/facility";
+import type { Facility, FacilityType } from "../../types/facility";
 import type { CreateFacilityPayload } from "../../types/verification";
+import EditFacilityModal from "../../components/facility/EditFacilityModal";
+import { useAuth } from "../../hooks/useAuth";
 
 const POPULAR_ZONES = [
   { name: "Saddar / Civil", lat: 24.8607, lng: 67.0011 },
@@ -15,6 +18,14 @@ const POPULAR_ZONES = [
 
 export default function ProviderFacilityPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // Tab State
+  const [activeMainTab, setActiveMainTab] = useState<"MY_FACILITIES" | "REGISTER">("MY_FACILITIES");
+  const [myFacilities, setMyFacilities] = useState<Facility[]>([]);
+  const [loadingFacilities, setLoadingFacilities] = useState(false);
+  const [editingFacility, setEditingFacility] = useState<Facility | null>(null);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -74,6 +85,12 @@ export default function ProviderFacilityPage() {
   const [coverageArea, setCoverageArea] = useState("Karachi Central");
   const [icuTransfer, setIcuTransfer] = useState(false);
   const [ambulanceNotes, setAmbulanceNotes] = useState("");
+
+  // Subtype - Clinic
+  const [consultationAvailable, setConsultationAvailable] = useState(true);
+  const [specialties, setSpecialties] = useState("General Medicine");
+  const [openWeekends, setOpenWeekends] = useState(false);
+  const [clinicNotes, setClinicNotes] = useState("");
 
   // Close suggestions on click outside
   useEffect(() => {
@@ -247,18 +264,26 @@ export default function ProviderFacilityPage() {
         equippedForIcuTransfer: icuTransfer,
         notes: ambulanceNotes.trim() || undefined,
       };
+    } else if (facilityType === "Clinic") {
+      payload.clinicDetails = {
+        consultationAvailable,
+        specialties: specialties.trim() || undefined,
+        openWeekends,
+        notes: clinicNotes.trim() || undefined,
+      };
     }
 
     try {
       setLoading(true);
       const created = await verificationService.createFacility(payload);
       setSuccessMessage(
-        `Facility '${created.name}' submitted successfully! A verification request has been queued for Administrator review.`
+        `Facility '${created.name}' submitted successfully! A verification ticket has been queued for Administrator review.`
       );
       // Reset main fields
       setName("");
       setAddress("");
       setPhoneNumber("");
+      await loadMyFacilities();
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
@@ -269,39 +294,121 @@ export default function ProviderFacilityPage() {
     }
   };
 
+  const loadMyFacilities = async () => {
+    try {
+      setLoadingFacilities(true);
+      const data = await facilityService.getMyFacilities();
+      setMyFacilities(data);
+    } catch (err: unknown) {
+      console.error("Failed to load provider facilities:", err);
+    } finally {
+      setLoadingFacilities(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMyFacilities();
+  }, []);
+
+  const handleDeactivate = async (fac: Facility) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to DEACTIVATE '${fac.name}'?\n\nThis will immediately remove it from all public search results, map markers, and emergency ranking. Any pending verification requests will be cancelled.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setActionLoadingId(fac.id);
+      setErrorMessage(null);
+      setSuccessMessage(null);
+      await facilityService.deactivateFacility(fac.id);
+      setSuccessMessage(`Facility '${fac.name}' has been deactivated and excluded from normal discovery.`);
+      await loadMyFacilities();
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        (err instanceof Error ? err.message : "Failed to deactivate facility.");
+      setErrorMessage(msg);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleReactivate = async (fac: Facility) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to REACTIVATE '${fac.name}'?\n\nThis will restore the facility to active directory status.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setActionLoadingId(fac.id);
+      setErrorMessage(null);
+      setSuccessMessage(null);
+      await facilityService.reactivateFacility(fac.id);
+      setSuccessMessage(`Facility '${fac.name}' has been reactivated successfully!`);
+      await loadMyFacilities();
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        (err instanceof Error ? err.message : "Failed to reactivate facility.");
+      setErrorMessage(msg);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleEditSuccess = (facilityName: string) => {
+    setSuccessMessage(
+      `Updates for '${facilityName}' have been submitted! Material changes are queued for administrator re-verification. Existing details remain live until approved.`
+    );
+    loadMyFacilities();
+  };
+
   return (
     <div style={{ maxWidth: "860px", margin: "0 auto", padding: "24px 16px" }}>
       {/* Header */}
-      <div style={{ marginBottom: "24px" }}>
+      <div style={{ marginBottom: "20px" }}>
         <h1 style={{ fontSize: "28px", fontWeight: "800", color: "#0f172a", marginBottom: "8px", letterSpacing: "-0.02em" }}>
           🏥 Medical Provider Portal
         </h1>
         <p style={{ color: "#64748b", fontSize: "15px", lineHeight: "1.5", margin: 0 }}>
-          Register your hospital, pharmacy, blood bank, or ambulance fleet in Karachi’s emergency response registry.
+          Manage your facilities, update emergency capabilities, or register new facilities in Karachi’s emergency response registry.
         </p>
       </div>
 
-      {/* Verification Notice */}
-      <div
-        style={{
-          backgroundColor: "#eff6ff",
-          border: "1px solid #bfdbfe",
-          borderRadius: "12px",
-          padding: "16px",
-          marginBottom: "24px",
-          display: "flex",
-          gap: "12px",
-          alignItems: "flex-start",
-          boxShadow: "0 2px 8px rgba(37, 99, 235, 0.05)",
-        }}
-      >
-        <span style={{ fontSize: "22px" }}>🛡️</span>
-        <div style={{ fontSize: "13px", color: "#1e40af", lineHeight: "1.6" }}>
-          <strong>Verification Process:</strong> All newly submitted facilities enter the registry as{" "}
-          <span style={{ fontWeight: "700", textDecoration: "underline" }}>Unverified</span>. A verification
-          ticket is automatically submitted to Administrator review. Upon approval, your facility receives the Verified
-          badge and highest priority in emergency navigation.
-        </div>
+      {/* Tab Switcher */}
+      <div style={{ display: "flex", gap: "10px", marginBottom: "20px", borderBottom: "1px solid #e2e8f0", paddingBottom: "12px" }}>
+        <button
+          type="button"
+          onClick={() => setActiveMainTab("MY_FACILITIES")}
+          style={{
+            padding: "10px 20px",
+            borderRadius: "8px",
+            border: activeMainTab === "MY_FACILITIES" ? "1px solid #2563eb" : "1px solid #cbd5e1",
+            backgroundColor: activeMainTab === "MY_FACILITIES" ? "#eff6ff" : "#ffffff",
+            color: activeMainTab === "MY_FACILITIES" ? "#1d4ed8" : "#475569",
+            fontWeight: activeMainTab === "MY_FACILITIES" ? 700 : 500,
+            fontSize: "14px",
+            cursor: "pointer",
+          }}
+        >
+          🏢 My Managed Facilities ({myFacilities.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveMainTab("REGISTER")}
+          style={{
+            padding: "10px 20px",
+            borderRadius: "8px",
+            border: activeMainTab === "REGISTER" ? "1px solid #dc2626" : "1px solid #cbd5e1",
+            backgroundColor: activeMainTab === "REGISTER" ? "#fef2f2" : "#ffffff",
+            color: activeMainTab === "REGISTER" ? "#dc2626" : "#475569",
+            fontWeight: activeMainTab === "REGISTER" ? 700 : 500,
+            fontSize: "14px",
+            cursor: "pointer",
+          }}
+        >
+          ➕ Register New Facility
+        </button>
       </div>
 
       {/* Error / Success Feedback */}
@@ -338,8 +445,25 @@ export default function ProviderFacilityPage() {
           }}
         >
           <div style={{ fontWeight: 600, fontSize: "15px" }}>✅ {successMessage}</div>
-          <div>
+          <div style={{ display: "flex", gap: "10px" }}>
             <button
+              type="button"
+              onClick={() => setActiveMainTab("MY_FACILITIES")}
+              style={{
+                backgroundColor: "#2563eb",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "8px",
+                padding: "8px 18px",
+                fontSize: "13px",
+                fontWeight: "600",
+                cursor: "pointer",
+              }}
+            >
+              View My Facilities
+            </button>
+            <button
+              type="button"
               onClick={() => navigate("/")}
               style={{
                 backgroundColor: "#16a34a",
@@ -357,6 +481,275 @@ export default function ProviderFacilityPage() {
           </div>
         </div>
       )}
+
+      {/* Main Tab Content */}
+      {activeMainTab === "MY_FACILITIES" ? (
+        <div>
+          {loadingFacilities ? (
+            <div style={{ textAlign: "center", padding: "48px 0", color: "#64748b" }}>
+              <div style={{ fontSize: "24px", marginBottom: "8px" }}>⏳</div>
+              Loading your managed facilities...
+            </div>
+          ) : myFacilities.length === 0 ? (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "60px 24px",
+                backgroundColor: "#ffffff",
+                borderRadius: "12px",
+                border: "1px solid #e2e8f0",
+              }}
+            >
+              <div style={{ fontSize: "36px", marginBottom: "12px" }}>🏥</div>
+              <h3 style={{ fontSize: "18px", fontWeight: "600", color: "#1e293b", marginBottom: "6px" }}>
+                No Facilities Registered Yet
+              </h3>
+              <p style={{ color: "#64748b", fontSize: "14px", marginBottom: "20px" }}>
+                You have not registered any emergency healthcare facilities under your provider account.
+              </p>
+              <button
+                type="button"
+                onClick={() => setActiveMainTab("REGISTER")}
+                style={{
+                  backgroundColor: "#dc2626",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "8px",
+                  padding: "10px 24px",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                ➕ Register Your First Facility
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              {myFacilities.map((fac) => {
+                const isActionRunning = actionLoadingId === fac.id;
+                return (
+                  <div
+                    key={fac.id}
+                    style={{
+                      backgroundColor: "#ffffff",
+                      borderRadius: "12px",
+                      border: "1px solid #e2e8f0",
+                      padding: "20px",
+                      boxShadow: "0 2px 4px rgba(0, 0, 0, 0.04)",
+                      opacity: fac.isActive ? 1 : 0.75,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        flexWrap: "wrap",
+                        gap: "12px",
+                        marginBottom: "12px",
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "6px" }}>
+                          <h3 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", margin: 0 }}>
+                            {fac.name}
+                          </h3>
+                          <span
+                            style={{
+                              fontSize: "12px",
+                              color: "#475569",
+                              backgroundColor: "#f1f5f9",
+                              padding: "2px 8px",
+                              borderRadius: "4px",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {fac.facilityType}
+                          </span>
+                          {/* Active / Deactivated badge */}
+                          {fac.isActive ? (
+                            <span
+                              style={{
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                color: "#166534",
+                                backgroundColor: "#dcfce7",
+                                border: "1px solid #bbf7d0",
+                                padding: "2px 8px",
+                                borderRadius: "12px",
+                              }}
+                            >
+                              ACTIVE
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                color: "#991b1b",
+                                backgroundColor: "#fee2e2",
+                                border: "1px solid #fecaca",
+                                padding: "2px 8px",
+                                borderRadius: "12px",
+                              }}
+                            >
+                              DEACTIVATED (HIDDEN)
+                            </span>
+                          )}
+
+                          {/* Verification badge */}
+                          {fac.hasPendingUpdate ? (
+                            <span
+                              style={{
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                color: "#b45309",
+                                backgroundColor: "#fef3c7",
+                                border: "1px solid #fde68a",
+                                padding: "2px 8px",
+                                borderRadius: "12px",
+                              }}
+                            >
+                              🔄 RE-VERIFICATION PENDING (STAGED CHANGES UNDER REVIEW)
+                            </span>
+                          ) : fac.isVerified ? (
+                            <span
+                              style={{
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                color: "#15803d",
+                                backgroundColor: "#dcfce7",
+                                border: "1px solid #bbf7d0",
+                                padding: "2px 8px",
+                                borderRadius: "12px",
+                              }}
+                            >
+                              ✓ VERIFIED
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: "11px",
+                                fontWeight: 600,
+                                color: "#64748b",
+                                backgroundColor: "#f1f5f9",
+                                border: "1px solid #e2e8f0",
+                                padding: "2px 8px",
+                                borderRadius: "12px",
+                              }}
+                            >
+                              ⏳ PENDING VERIFICATION
+                            </span>
+                          )}
+                        </div>
+
+                        <p style={{ color: "#475569", fontSize: "14px", margin: "0 0 4px 0" }}>
+                          📍 {fac.address}, {fac.city || "Karachi"} ({fac.latitude.toFixed(4)}, {fac.longitude.toFixed(4)})
+                        </p>
+                        {fac.phoneNumber && (
+                          <p style={{ color: "#64748b", fontSize: "13px", margin: 0 }}>
+                            📞 Phone: {fac.phoneNumber}
+                          </p>
+                        )}
+                        {!fac.isActive && (
+                          <p style={{ color: "#dc2626", fontSize: "12px", margin: "6px 0 0 0", fontWeight: 600 }}>
+                            ⚠️ This facility is soft-deleted and excluded from all public searches, map markers, and emergency ranking.
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Action buttons */}
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        {fac.isActive ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setEditingFacility(fac)}
+                              style={{
+                                padding: "6px 14px",
+                                borderRadius: "6px",
+                                border: "1px solid #93c5fd",
+                                backgroundColor: "#eff6ff",
+                                color: "#1d4ed8",
+                                fontSize: "13px",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                              }}
+                            >
+                              ✏️ Edit Details
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeactivate(fac)}
+                              disabled={isActionRunning}
+                              style={{
+                                padding: "6px 14px",
+                                borderRadius: "6px",
+                                border: "1px solid #fecaca",
+                                backgroundColor: "#fef2f2",
+                                color: "#dc2626",
+                                fontSize: "13px",
+                                fontWeight: 600,
+                                cursor: isActionRunning ? "not-allowed" : "pointer",
+                              }}
+                            >
+                              {isActionRunning ? "Deactivating..." : "🗑️ Deactivate"}
+                            </button>
+                          </>
+                        ) : (
+                          user?.role === "ADMIN" && (
+                            <button
+                              type="button"
+                              onClick={() => handleReactivate(fac)}
+                              disabled={isActionRunning}
+                              style={{
+                                padding: "6px 14px",
+                                borderRadius: "6px",
+                                border: "1px solid #bbf7d0",
+                                backgroundColor: "#f0fdf4",
+                                color: "#166534",
+                                fontSize: "13px",
+                                fontWeight: 600,
+                                cursor: isActionRunning ? "not-allowed" : "pointer",
+                              }}
+                            >
+                              {isActionRunning ? "Reactivating..." : "🔄 Reactivate Facility"}
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* Verification Notice */}
+          <div
+            style={{
+              backgroundColor: "#eff6ff",
+              border: "1px solid #bfdbfe",
+              borderRadius: "12px",
+              padding: "16px",
+              marginBottom: "24px",
+              display: "flex",
+              gap: "12px",
+              alignItems: "flex-start",
+              boxShadow: "0 2px 8px rgba(37, 99, 235, 0.05)",
+            }}
+          >
+            <span style={{ fontSize: "22px" }}>🛡️</span>
+            <div style={{ fontSize: "13px", color: "#1e40af", lineHeight: "1.6" }}>
+              <strong>Verification Process:</strong> All newly submitted facilities enter the registry as{" "}
+              <span style={{ fontWeight: "700", textDecoration: "underline" }}>Unverified</span>. A verification
+              ticket is automatically submitted to Administrator review. Upon approval, your facility receives the Verified
+              badge and highest priority in emergency navigation.
+            </div>
+          </div>
 
       {/* Main Submission Form */}
       <form
@@ -423,6 +816,7 @@ export default function ProviderFacilityPage() {
               <option value="Blood Bank">Blood Bank</option>
               <option value="Pharmacy">Pharmacy</option>
               <option value="Ambulance">Ambulance Service</option>
+              <option value="Clinic">Clinic / Diagnostic Center</option>
             </select>
           </div>
         </div>
@@ -1014,6 +1408,74 @@ export default function ProviderFacilityPage() {
           </div>
         )}
 
+        {/* Clinic Details Form */}
+        {facilityType === "Clinic" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", color: "#1e293b", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={consultationAvailable}
+                  onChange={(e) => setConsultationAvailable(e.target.checked)}
+                />
+                Doctor Consultation Available
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", color: "#1e293b", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={openWeekends}
+                  onChange={(e) => setOpenWeekends(e.target.checked)}
+                />
+                Open on Weekends (Saturday / Sunday)
+              </label>
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>
+                Clinical Specialties
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. General Medicine, Pediatrics, Dental, Diagnostics"
+                value={specialties}
+                onChange={(e) => setSpecialties(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  border: "1px solid #cbd5e1",
+                  fontSize: "14px",
+                  color: "#0f172a",
+                  backgroundColor: "#ffffff",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>
+                Clinic Notes & Timings
+              </label>
+              <textarea
+                rows={2}
+                placeholder="Walk-in consultation timings, diagnostic lab services, appointment contacts..."
+                value={clinicNotes}
+                onChange={(e) => setClinicNotes(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  border: "1px solid #cbd5e1",
+                  fontSize: "14px",
+                  color: "#0f172a",
+                  backgroundColor: "#ffffff",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Submit Button */}
         <div style={{ marginTop: "32px", display: "flex", justifyContent: "flex-end" }}>
           <button
@@ -1036,6 +1498,17 @@ export default function ProviderFacilityPage() {
           </button>
         </div>
       </form>
+        </>
+      )}
+
+      {/* Edit Facility Modal */}
+      {editingFacility && (
+        <EditFacilityModal
+          facility={editingFacility}
+          onClose={() => setEditingFacility(null)}
+          onSuccess={handleEditSuccess}
+        />
+      )}
     </div>
   );
 }

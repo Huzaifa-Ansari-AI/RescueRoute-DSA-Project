@@ -1,18 +1,22 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { lazy } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import MainLayout from "../components/layout/MainLayout";
 import { AuthProvider } from "../context/AuthContext";
-
-import HomePage from "../pages/Home/HomePage";
-import HospitalsPage from "../pages/Hospitals/HospitalsPage";
-import BloodBanksPage from "../pages/BloodBanks/BloodBanksPage";
-import PharmaciesPage from "../pages/Pharmacies/PharmaciesPage";
-import AmbulancesPage from "../pages/Ambulances/AmbulancesPage";
-import LoginPage from "../pages/Login/LoginPage";
-import ProviderFacilityPage from "../pages/Provider/ProviderFacilityPage";
-import AdminVerificationPage from "../pages/Admin/AdminVerificationPage";
-import NotFoundPage from "../pages/NotFound/NotFoundPage";
 import { ProtectedRoute } from "../components/common/ProtectedRoute";
+
+// Code-split route components for optimal LCP and lazy loading
+const HomePage = lazy(() => import("../pages/Home/HomePage"));
+const HospitalsPage = lazy(() => import("../pages/Hospitals/HospitalsPage"));
+const ClinicsPage = lazy(() => import("../pages/Clinics/ClinicsPage"));
+const BloodBanksPage = lazy(() => import("../pages/BloodBanks/BloodBanksPage"));
+const PharmaciesPage = lazy(() => import("../pages/Pharmacies/PharmaciesPage"));
+const AmbulancesPage = lazy(() => import("../pages/Ambulances/AmbulancesPage"));
+const LoginPage = lazy(() => import("../pages/Login/LoginPage"));
+const ProviderFacilityPage = lazy(() => import("../pages/Provider/ProviderFacilityPage"));
+const AdminVerificationPage = lazy(() => import("../pages/Admin/AdminVerificationPage"));
+const AdminFacilityManagementPage = lazy(() => import("../pages/Admin/AdminFacilityManagementPage"));
+const NotFoundPage = lazy(() => import("../pages/NotFound/NotFoundPage"));
 
 export default function AppRouter() {
     return (
@@ -25,6 +29,11 @@ export default function AppRouter() {
                         <Route
                             path="/hospitals"
                             element={<HospitalsPage />}
+                        />
+
+                        <Route
+                            path="/clinics"
+                            element={<ClinicsPage />}
                         />
 
                         <Route
@@ -43,6 +52,11 @@ export default function AppRouter() {
                         />
 
                         <Route
+                            path="/external-discovery"
+                            element={<Navigate to="/" replace />}
+                        />
+
+                        <Route
                             path="/login"
                             element={<LoginPage />}
                         />
@@ -51,7 +65,7 @@ export default function AppRouter() {
                         <Route
                             path="/provider/create-facility"
                             element={
-                                <ProtectedRoute allowedRoles={["PROVIDER"]}>
+                                <ProtectedRoute allowedRoles={["PROVIDER", "ADMIN"]}>
                                     <ProviderFacilityPage />
                                 </ProtectedRoute>
                             }
@@ -63,6 +77,16 @@ export default function AppRouter() {
                             element={
                                 <ProtectedRoute allowedRoles={["ADMIN"]}>
                                     <AdminVerificationPage />
+                                </ProtectedRoute>
+                            }
+                        />
+
+                        {/* Protected Admin Facility Management */}
+                        <Route
+                            path="/admin/facilities"
+                            element={
+                                <ProtectedRoute allowedRoles={["ADMIN"]}>
+                                    <AdminFacilityManagementPage />
                                 </ProtectedRoute>
                             }
                         />

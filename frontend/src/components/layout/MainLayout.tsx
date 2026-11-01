@@ -1,5 +1,8 @@
+import { Suspense } from "react";
 import { Outlet } from "react-router-dom";
 import Navbar from "./Navbar";
+import Footer from "./Footer";
+import Loading from "../ui/Loading";
 
 export default function MainLayout() {
     return (
@@ -8,6 +11,7 @@ export default function MainLayout() {
                 minHeight: "100vh",
                 display: "flex",
                 flexDirection: "column",
+                backgroundColor: "#f8fafc",
             }}
         >
             <Navbar />
@@ -15,13 +19,17 @@ export default function MainLayout() {
             <main
                 style={{
                     flex: 1,
-                    padding: "1.5rem",
+                    display: "flex",
+                    flexDirection: "column",
                 }}
             >
-                <Outlet />
+                <Suspense fallback={<Loading message="Loading RescueRoute..." size="large" />}>
+                    <Outlet />
+                </Suspense>
             </main>
 
-            {/* Footer will be added later */}
+            <Footer />
         </div>
     );
 }
+

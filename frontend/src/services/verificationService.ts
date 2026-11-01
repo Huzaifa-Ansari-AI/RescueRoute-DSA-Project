@@ -39,7 +39,7 @@ export const verificationService = {
    */
   async createFacility(payload: CreateFacilityPayload): Promise<Facility> {
     const response = await apiClient.post<ApiResponse<RawFacilityResponse>>(
-      "/api/v1/facilities",
+      "/facilities",
       payload
     );
     if (!response.data.success || !response.data.data) {
@@ -54,7 +54,7 @@ export const verificationService = {
   async getVerificationRequests(status?: string): Promise<VerificationRequest[]> {
     const params = status ? { status } : {};
     const response = await apiClient.get<ApiResponse<VerificationRequest[]>>(
-      "/api/v1/admin/verification-requests",
+      "/admin/verification-requests",
       { params }
     );
     if (!response.data.success) {
@@ -68,7 +68,7 @@ export const verificationService = {
    */
   async getVerificationRequestById(id: string): Promise<VerificationRequest> {
     const response = await apiClient.get<ApiResponse<VerificationRequest>>(
-      `/api/v1/admin/verification-requests/${id}`
+      `/admin/verification-requests/${id}`
     );
     if (!response.data.success || !response.data.data) {
       throw new Error(response.data.message || "Failed to load verification request.");
@@ -84,7 +84,7 @@ export const verificationService = {
     payload: VerificationDecisionPayload
   ): Promise<VerificationRequest> {
     const response = await apiClient.put<ApiResponse<VerificationRequest>>(
-      `/api/v1/admin/verification-requests/${id}`,
+      `/admin/verification-requests/${id}`,
       payload
     );
     if (!response.data.success || !response.data.data) {
@@ -98,7 +98,7 @@ export const verificationService = {
    */
   async approveRequest(id: string, reviewNotes?: string): Promise<VerificationRequest> {
     const response = await apiClient.put<ApiResponse<VerificationRequest>>(
-      `/api/v1/admin/verification-requests/${id}/approve`,
+      `/admin/verification-requests/${id}/approve`,
       { decision: "APPROVED", reviewNotes }
     );
     if (!response.data.success || !response.data.data) {
@@ -112,7 +112,7 @@ export const verificationService = {
    */
   async rejectRequest(id: string, reviewNotes: string): Promise<VerificationRequest> {
     const response = await apiClient.put<ApiResponse<VerificationRequest>>(
-      `/api/v1/admin/verification-requests/${id}/reject`,
+      `/admin/verification-requests/${id}/reject`,
       { decision: "REJECTED", reviewNotes }
     );
     if (!response.data.success || !response.data.data) {

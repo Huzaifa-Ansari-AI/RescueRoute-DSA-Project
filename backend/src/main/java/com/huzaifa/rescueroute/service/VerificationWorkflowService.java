@@ -2,6 +2,7 @@ package com.huzaifa.rescueroute.service;
 
 import com.huzaifa.rescueroute.dto.CreateFacilityRequestDto;
 import com.huzaifa.rescueroute.dto.FacilityResponseDto;
+import com.huzaifa.rescueroute.dto.UpdateFacilityRequestDto;
 import com.huzaifa.rescueroute.dto.VerificationDecisionRequestDto;
 import com.huzaifa.rescueroute.dto.VerificationRequestResponseDto;
 
@@ -24,6 +25,18 @@ public interface VerificationWorkflowService {
      * @return Complete FacilityResponseDto of the persisted facility
      */
     FacilityResponseDto createFacilityWithVerification(CreateFacilityRequestDto request, String providerEmail);
+
+    /**
+     * Submits an update to an existing facility by an authorized provider or admin.
+     * The changes are staged in a PENDING verification request without modifying live active data.
+     * The facility is flagged with hasPendingUpdate = true until admin moderation.
+     *
+     * @param facilityId    UUID of the facility to update
+     * @param request       Validated update payload with proposed changes
+     * @param providerEmail Email of the authenticated provider or admin
+     * @return FacilityResponseDto reflecting current live facility data with hasPendingUpdate = true
+     */
+    FacilityResponseDto submitFacilityUpdate(UUID facilityId, UpdateFacilityRequestDto request, String providerEmail);
 
     /**
      * Retrieves all verification requests, optionally filtered by status (PENDING, APPROVED, REJECTED).

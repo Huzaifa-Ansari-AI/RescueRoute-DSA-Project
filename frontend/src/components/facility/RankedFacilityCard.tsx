@@ -18,12 +18,27 @@ export const RankedFacilityCard: React.FC<RankedFacilityCardProps> = ({
   onSelect,
   onGetDirections,
 }) => {
-  const { rank, distanceKm, score, isVerified, emergencyAvailable, facility } = rankedFacility;
+  const {
+    rank,
+    distanceKm,
+    straightLineDistanceKm,
+    drivingDistanceKm,
+    estimatedTravelMinutes,
+    routingAvailable,
+    score,
+    isVerified,
+    emergencyAvailable,
+    facility,
+  } = rankedFacility;
+
+  const effectiveStraightLine = straightLineDistanceKm ?? distanceKm;
 
   const getTypeBadgeColor = (type: string) => {
     switch (type) {
       case "Hospital":
         return { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" };
+      case "Clinic":
+        return { bg: "#ecfeff", text: "#0891b2", border: "#a5f3fc" };
       case "Blood Bank":
         return { bg: "#fef2f2", text: "#b91c1c", border: "#fecaca" };
       case "Pharmacy":
@@ -121,20 +136,58 @@ export const RankedFacilityCard: React.FC<RankedFacilityCardProps> = ({
           </span>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          <span
-            style={{
-              fontSize: "12px",
-              fontWeight: 600,
-              color: "#0284c7",
-              backgroundColor: "#f0f9ff",
-              padding: "2px 8px",
-              borderRadius: "6px",
-              border: "1px solid #bae6fd",
-            }}
-          >
-            📍 {distanceKm.toFixed(1)} km
-          </span>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px" }}>
+          {routingAvailable && drivingDistanceKm != null && estimatedTravelMinutes != null ? (
+            <>
+              <span
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  color: "#15803d",
+                  backgroundColor: "#f0fdf4",
+                  padding: "3px 8px",
+                  borderRadius: "6px",
+                  border: "1px solid #bbf7d0",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                }}
+                title="Driving route distance & estimated travel duration (OSRM road network)"
+              >
+                🚗 {drivingDistanceKm.toFixed(1)} km · {estimatedTravelMinutes} min
+              </span>
+              <span
+                style={{
+                  fontSize: "11px",
+                  color: "#64748b",
+                  fontWeight: 500,
+                }}
+                title="Geographical straight-line distance (Haversine)"
+              >
+                📍 {effectiveStraightLine.toFixed(1)} km straight-line
+              </span>
+            </>
+          ) : (
+            <>
+              <span
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  color: "#0284c7",
+                  backgroundColor: "#f0f9ff",
+                  padding: "2px 8px",
+                  borderRadius: "6px",
+                  border: "1px solid #bae6fd",
+                }}
+                title="Straight-line distance (road network data unavailable)"
+              >
+                📍 {effectiveStraightLine.toFixed(1)} km
+              </span>
+              <span style={{ fontSize: "10px", color: "#94a3b8" }}>
+                straight-line
+              </span>
+            </>
+          )}
         </div>
       </div>
 

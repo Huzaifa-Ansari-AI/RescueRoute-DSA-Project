@@ -4,6 +4,7 @@ import type {
   BloodBankDetails,
   PharmacyDetails,
   AmbulanceDetails,
+  ClinicDetails,
   Facility,
 } from "./facility";
 import type { User } from "./auth";
@@ -22,6 +23,21 @@ export interface CreateFacilityPayload {
   bloodBankDetails?: Partial<BloodBankDetails>;
   pharmacyDetails?: Partial<PharmacyDetails>;
   ambulanceDetails?: Partial<AmbulanceDetails>;
+  clinicDetails?: Partial<ClinicDetails>;
+}
+
+export interface UpdateFacilityPayload {
+  name: string;
+  address: string;
+  city?: string;
+  latitude: number;
+  longitude: number;
+  phoneNumber?: string;
+  hospitalDetails?: Partial<HospitalDetails>;
+  bloodBankDetails?: Partial<BloodBankDetails>;
+  pharmacyDetails?: Partial<PharmacyDetails>;
+  ambulanceDetails?: Partial<AmbulanceDetails>;
+  clinicDetails?: Partial<ClinicDetails>;
 }
 
 export interface VerificationRequest {
@@ -35,8 +51,13 @@ export interface VerificationRequest {
   facilityLongitude: number;
   facilityPhoneNumber?: string;
   facilityVerified: boolean;
+  facilityActive?: boolean;
+  facilityDeletedAt?: string | null;
+  facilityHasPendingUpdate?: boolean;
   submittedBy?: User;
   status: VerificationStatus;
+  requestType?: "CREATION" | "UPDATE";
+  proposedChanges?: UpdateFacilityPayload | null;
   reviewedBy?: User;
   reviewNotes?: string;
   submittedAt: string;

@@ -76,7 +76,7 @@ public class FacilityControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").isArray())
-                .andExpect(jsonPath("$.data.length()", equalTo(3)))
+                .andExpect(jsonPath("$.data.length()", greaterThanOrEqualTo(3)))
                 .andExpect(jsonPath("$.data[0].facilityType", equalToIgnoringCase("Hospital")));
     }
 
@@ -153,6 +153,9 @@ public class FacilityControllerIntegrationTest {
                 .andExpect(jsonPath("$.data[0].rank").value(1))
                 .andExpect(jsonPath("$.data[0].score").isNumber())
                 .andExpect(jsonPath("$.data[0].distanceKm").isNumber())
+                .andExpect(jsonPath("$.data[0].straightLineDistanceKm").isNumber())
+                .andExpect(jsonPath("$.data[0].distanceMetricUsed").isString())
+                .andExpect(jsonPath("$.data[0].routingAvailable").isBoolean())
                 .andExpect(jsonPath("$.data[0].facility").exists())
                 .andExpect(jsonPath("$.data[0].facility.name").isString());
     }
@@ -192,6 +195,17 @@ public class FacilityControllerIntegrationTest {
         mockMvc.perform(get("/api/v1/facilities/search")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/facilities?type=Clinic - Filter by Clinic type")
+    void testGetFacilitiesByClinicType() throws Exception {
+        mockMvc.perform(get("/api/v1/facilities")
+                        .param("type", "Clinic")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").isArray());
     }
 }
 

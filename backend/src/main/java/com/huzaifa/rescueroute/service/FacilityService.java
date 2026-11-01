@@ -28,4 +28,41 @@ public interface FacilityService {
      * @throws com.huzaifa.rescueroute.common.exception.ResourceNotFoundException if facility does not exist
      */
     FacilityResponseDto getFacilityById(UUID id);
+
+    /**
+     * Safely deactivates (soft-deletes) a facility, excluding it from search, maps, and ranking.
+     *
+     * @param id          UUID of the facility to deactivate
+     * @param callerEmail Email of authenticated provider or admin
+     * @return Updated FacilityResponseDto
+     */
+    FacilityResponseDto deactivateFacility(UUID id, String callerEmail);
+
+    /**
+     * Restores/reactivates a previously soft-deleted facility (Admin only).
+     *
+     * @param id         UUID of the facility to reactivate
+     * @param adminEmail Email of authenticated admin
+     * @return Updated FacilityResponseDto
+     */
+    FacilityResponseDto reactivateFacility(UUID id, String adminEmail);
+
+    /**
+     * Retrieves all facilities owned/managed by a specific provider.
+     *
+     * @param providerEmail Email of authenticated provider
+     * @return List of FacilityResponseDto records owned by the provider
+     */
+    List<FacilityResponseDto> getFacilitiesByProvider(String providerEmail);
+
+    /**
+     * Retrieves all facilities for administrator management with comprehensive filters.
+     *
+     * @param type     Optional facility type filter
+     * @param city     Optional city filter
+     * @param active   Optional active status filter (null for all)
+     * @param verified Optional verification status filter (null for all)
+     * @return List of matching FacilityResponseDto records
+     */
+    List<FacilityResponseDto> getAdminFacilities(String type, String city, Boolean active, Boolean verified);
 }

@@ -29,6 +29,8 @@ const getCategoryIcon = (type: string) => {
   switch (type) {
     case "Hospital":
       return "🏥";
+    case "Clinic":
+      return "🩺";
     case "Blood Bank":
       return "🩸";
     case "Pharmacy":

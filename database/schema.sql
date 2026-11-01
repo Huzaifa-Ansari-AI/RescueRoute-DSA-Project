@@ -32,7 +32,7 @@ CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE TABLE IF NOT EXISTS facilities (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
-    facility_type VARCHAR(50) NOT NULL CHECK (facility_type IN ('Hospital', 'Blood Bank', 'Pharmacy', 'Ambulance')),
+    facility_type VARCHAR(50) NOT NULL CHECK (facility_type IN ('Hospital', 'Blood Bank', 'Pharmacy', 'Ambulance', 'Clinic')),
     address TEXT NOT NULL,
     city VARCHAR(100) NOT NULL DEFAULT 'Karachi',
     latitude DOUBLE PRECISION NOT NULL,
@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS facilities (
     phone_number VARCHAR(50),
     is_verified BOOLEAN NOT NULL DEFAULT FALSE,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    has_pending_update BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMP WITH TIME ZONE,
     created_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -49,6 +51,8 @@ CREATE INDEX IF NOT EXISTS idx_facilities_type ON facilities(facility_type);
 CREATE INDEX IF NOT EXISTS idx_facilities_city ON facilities(city);
 CREATE INDEX IF NOT EXISTS idx_facilities_is_verified ON facilities(is_verified);
 CREATE INDEX IF NOT EXISTS idx_facilities_is_active ON facilities(is_active);
+CREATE INDEX IF NOT EXISTS idx_facilities_has_pending_update ON facilities(has_pending_update);
+CREATE INDEX IF NOT EXISTS idx_facilities_deleted_at ON facilities(deleted_at);
 
 -- -----------------------------------------------------------------------------
 -- 3. HOSPITALS
@@ -114,7 +118,22 @@ CREATE TABLE IF NOT EXISTS ambulances (
 );
 
 -- -----------------------------------------------------------------------------
--- 7. VERIFICATION REQUESTS
+-- 7. CLINICS
+-- Outpatient consultations, specialties, and operating schedules
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS clinics (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    facility_id UUID UNIQUE NOT NULL REFERENCES facilities(id) ON DELETE CASCADE,
+    consultation_available BOOLEAN NOT NULL DEFAULT TRUE,
+    specialties TEXT,
+    open_weekends BOOLEAN NOT NULL DEFAULT FALSE,
+    notes TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_clinics_facility_id ON clinics(facility_id);
+
+-- -----------------------------------------------------------------------------
+-- 8. VERIFICATION REQUESTS
 -- Audit trail and moderation queue for provider facility verification
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS verification_requests (
@@ -122,6 +141,8 @@ CREATE TABLE IF NOT EXISTS verification_requests (
     facility_id UUID NOT NULL REFERENCES facilities(id) ON DELETE CASCADE,
     submitted_by UUID REFERENCES users(id) ON DELETE SET NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
+    request_type VARCHAR(50) NOT NULL DEFAULT 'CREATION' CHECK (request_type IN ('CREATION', 'UPDATE')),
+    proposed_changes TEXT,
     reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
     review_notes TEXT,
     submitted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -129,9 +150,10 @@ CREATE TABLE IF NOT EXISTS verification_requests (
 );
 
 CREATE INDEX IF NOT EXISTS idx_verification_requests_status ON verification_requests(status);
+CREATE INDEX IF NOT EXISTS idx_verification_requests_request_type ON verification_requests(request_type);
 
 -- -----------------------------------------------------------------------------
--- 8. ADMIN LOGS
+-- 9. ADMIN LOGS
 -- Immutable activity log of admin actions
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS admin_logs (
@@ -145,7 +167,7 @@ CREATE TABLE IF NOT EXISTS admin_logs (
 );
 
 -- -----------------------------------------------------------------------------
--- 9. ROUTES
+-- 10. ROUTES
 -- History of calculated emergency navigation routes
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS routes (
@@ -161,3 +183,38 @@ CREATE TABLE IF NOT EXISTS routes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_routes_destination_facility_id ON routes(destination_facility_id);
+
+-- -----------------------------------------------------------------------------
+-- 11. EXTERNAL FACILITIES (Phase 4: OpenStreetMap / Overpass Integration)
+-- Separately stored, unverified external points of interest discovered via Overpass
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS external_facilities (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    source VARCHAR(50) NOT NULL DEFAULT 'OPENSTREETMAP',
+    osm_element_type VARCHAR(20) NOT NULL, -- 'node', 'way', 'relation'
+    osm_element_id BIGINT NOT NULL,
+    source_url TEXT,
+    name VARCHAR(255) NOT NULL,
+    facility_type VARCHAR(50) NOT NULL, -- 'Hospital', 'Clinic', 'Pharmacy', 'Blood Bank', 'Ambulance'
+    osm_tags TEXT, -- JSON string of raw OpenStreetMap tags
+    latitude DOUBLE PRECISION NOT NULL,
+    longitude DOUBLE PRECISION NOT NULL,
+    address TEXT,
+    city VARCHAR(100) DEFAULT 'Karachi',
+    phone_number VARCHAR(100),
+    website TEXT,
+    opening_hours TEXT,
+    import_status VARCHAR(50) NOT NULL DEFAULT 'DISCOVERED', -- 'DISCOVERED', 'DUPLICATE_CANDIDATE', 'REVIEWED', 'SUPPRESSED'
+    matched_facility_id UUID REFERENCES facilities(id) ON DELETE SET NULL,
+    imported_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_external_facilities_source_element UNIQUE (source, osm_element_type, osm_element_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ext_facilities_source_osm ON external_facilities(source, osm_element_type, osm_element_id);
+CREATE INDEX IF NOT EXISTS idx_ext_facilities_status ON external_facilities(import_status);
+CREATE INDEX IF NOT EXISTS idx_ext_facilities_type ON external_facilities(facility_type);
+CREATE INDEX IF NOT EXISTS idx_ext_facilities_coords ON external_facilities(latitude, longitude);
+CREATE INDEX IF NOT EXISTS idx_ext_facilities_matched_facility ON external_facilities(matched_facility_id);

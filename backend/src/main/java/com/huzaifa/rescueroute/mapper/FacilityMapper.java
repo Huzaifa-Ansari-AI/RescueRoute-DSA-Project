@@ -29,6 +29,8 @@ public class FacilityMapper {
                 .phoneNumber(facility.getPhoneNumber())
                 .isVerified(facility.isVerified())
                 .isActive(facility.isActive())
+                .hasPendingUpdate(facility.isHasPendingUpdate())
+                .deletedAt(facility.getDeletedAt())
                 .createdAt(facility.getCreatedAt())
                 .updatedAt(facility.getUpdatedAt());
 
@@ -43,6 +45,9 @@ public class FacilityMapper {
         }
         if (facility.getAmbulance() != null) {
             builder.ambulanceDetails(toAmbulanceDetailsDto(facility.getAmbulance()));
+        }
+        if (facility.getClinic() != null) {
+            builder.clinicDetails(toClinicDetailsDto(facility.getClinic()));
         }
 
         return builder.build();
@@ -120,6 +125,22 @@ public class FacilityMapper {
                 .coverageArea(ambulance.getCoverageArea())
                 .equippedForIcuTransfer(ambulance.isEquippedForIcuTransfer())
                 .notes(ambulance.getNotes())
+                .build();
+    }
+
+    /**
+     * Maps Clinic entity to ClinicDetailsDto.
+     */
+    public ClinicDetailsDto toClinicDetailsDto(Clinic clinic) {
+        if (clinic == null) {
+            return null;
+        }
+        return ClinicDetailsDto.builder()
+                .id(clinic.getId())
+                .consultationAvailable(clinic.isConsultationAvailable())
+                .specialties(clinic.getSpecialties())
+                .openWeekends(clinic.isOpenWeekends())
+                .notes(clinic.getNotes())
                 .build();
     }
 }

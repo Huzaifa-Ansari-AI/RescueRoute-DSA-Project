@@ -21,6 +21,7 @@ export default function CategoryFilter({
     >
       <option value="All">All Facilities</option>
       <option value="Hospital">Hospital</option>
+      <option value="Clinic">Clinic</option>
       <option value="Blood Bank">Blood Bank</option>
       <option value="Pharmacy">Pharmacy</option>
       <option value="Ambulance">Ambulance</option>

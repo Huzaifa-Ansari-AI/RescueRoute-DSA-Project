@@ -19,6 +19,17 @@ public class RankedFacilityResponseDto {
 
     private double distanceKm;
 
+    private Double straightLineDistanceKm;
+
+    private Double drivingDistanceKm;
+
+    private Integer estimatedTravelMinutes;
+
+    private String distanceMetricUsed;
+
+    @JsonProperty("routingAvailable")
+    private boolean routingAvailable;
+
     private double score;
 
     @JsonProperty("isVerified")

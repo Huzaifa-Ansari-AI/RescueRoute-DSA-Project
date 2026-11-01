@@ -79,18 +79,20 @@ VITE_API_BASE_URL=https://api.rescueroute.com/api/v1
 
 ## Backend
 
-Required variables:
+Required variables (set in Render Dashboard or Environment Groups):
 
 ```text
-DATABASE_URL
-DATABASE_USERNAME
-DATABASE_PASSWORD
-JWT_SECRET
-SERVER_PORT
-SPRING_PROFILES_ACTIVE
+SPRING_DATASOURCE_URL=jdbc:postgresql://<neon-pooler-host>.neon.tech/neondb?sslmode=require
+SPRING_DATASOURCE_USERNAME=<db-username>
+SPRING_DATASOURCE_PASSWORD=<db-password>
+SPRING_PROFILES_ACTIVE=prod
+JWT_SECRET=<secure-random-256-bit-key>
+JWT_EXPIRATION_MS=86400000
+CORS_ALLOWED_ORIGINS=https://<your-vercel-app>.vercel.app,http://localhost:5173
+PORT=8080
 ```
 
-Never commit these values to Git.
+Never commit these values to Git. Production secrets must be configured directly within the Render environment console.
 
 ---
 

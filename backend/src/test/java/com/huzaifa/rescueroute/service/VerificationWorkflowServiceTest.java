@@ -16,6 +16,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.mockito.Spy;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -42,6 +45,9 @@ public class VerificationWorkflowServiceTest {
 
     @Mock
     private FacilityMapper facilityMapper;
+
+    @Spy
+    private ObjectMapper objectMapper = new ObjectMapper();
 
     @InjectMocks
     private VerificationWorkflowServiceImpl verificationWorkflowService;
@@ -302,5 +308,209 @@ public class VerificationWorkflowServiceTest {
 
         assertThrows(ResourceNotFoundException.class, () ->
                 verificationWorkflowService.getVerificationRequestById(randomId));
+    }
+
+    @Test
+    @DisplayName("Provider successfully submits facility update: stages proposed changes, leaves live entity unchanged, marks hasPendingUpdate true")
+    void testSubmitFacilityUpdate_Success() {
+        testFacility.setVerified(true);
+        when(facilityRepository.findById(testFacility.getId())).thenReturn(Optional.of(testFacility));
+        when(userRepository.findByEmail(providerUser.getEmail())).thenReturn(Optional.of(providerUser));
+        when(verificationRequestRepository.findByFacilityIdAndStatus(testFacility.getId(), "PENDING")).thenReturn(List.of());
+        when(facilityRepository.save(any(Facility.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(verificationRequestRepository.save(any(VerificationRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(facilityMapper.toDto(any(Facility.class))).thenReturn(FacilityResponseDto.builder()
+                .id(testFacility.getId())
+                .name("Karachi Trauma Care")
+                .hasPendingUpdate(true)
+                .isVerified(true)
+                .build());
+
+        UpdateFacilityRequestDto updateDto = UpdateFacilityRequestDto.builder()
+                .name("Karachi Advanced Trauma Center")
+                .address("New Stadium Road")
+                .city("Karachi")
+                .latitude(24.8930)
+                .longitude(67.0750)
+                .phoneNumber("021-99999999")
+                .hospitalDetails(HospitalDetailsDto.builder()
+                        .emergencyAvailable(true)
+                        .icuAvailable(true)
+                        .traumaCenterAvailable(true)
+                        .build())
+                .build();
+
+        FacilityResponseDto response = verificationWorkflowService.submitFacilityUpdate(
+                testFacility.getId(), updateDto, providerUser.getEmail());
+
+        assertNotNull(response);
+        assertTrue(response.isHasPendingUpdate());
+        // Live entity name in DB remains the old name until approved
+        assertEquals("Karachi Trauma Care", testFacility.getName());
+        assertTrue(testFacility.isHasPendingUpdate());
+
+        ArgumentCaptor<VerificationRequest> captor = ArgumentCaptor.forClass(VerificationRequest.class);
+        verify(verificationRequestRepository).save(captor.capture());
+        VerificationRequest stagedRequest = captor.getValue();
+        assertEquals("UPDATE", stagedRequest.getRequestType());
+        assertEquals("PENDING", stagedRequest.getStatus());
+        assertNotNull(stagedRequest.getProposedChanges());
+        assertTrue(stagedRequest.getProposedChanges().contains("Karachi Advanced Trauma Center"));
+    }
+
+    @Test
+    @DisplayName("Unauthorized provider cannot update another provider's facility (AccessDeniedException)")
+    void testSubmitFacilityUpdate_CrossProvider_AccessDenied() {
+        User otherProvider = User.builder()
+                .id(UUID.randomUUID())
+                .email("other@rescueroute.com")
+                .role(UserRole.PROVIDER)
+                .build();
+
+        when(facilityRepository.findById(testFacility.getId())).thenReturn(Optional.of(testFacility));
+        when(userRepository.findByEmail(otherProvider.getEmail())).thenReturn(Optional.of(otherProvider));
+
+        UpdateFacilityRequestDto updateDto = UpdateFacilityRequestDto.builder()
+                .name("Hacked Name")
+                .address("Street 1")
+                .latitude(24.8)
+                .longitude(67.0)
+                .build();
+
+        assertThrows(AccessDeniedException.class, () ->
+                verificationWorkflowService.submitFacilityUpdate(testFacility.getId(), updateDto, otherProvider.getEmail()));
+
+        verify(verificationRequestRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Cannot submit update on a deactivated facility (IllegalStateException)")
+    void testSubmitFacilityUpdate_DeactivatedFacility_ThrowsException() {
+        testFacility.setActive(false);
+        when(facilityRepository.findById(testFacility.getId())).thenReturn(Optional.of(testFacility));
+
+        UpdateFacilityRequestDto updateDto = UpdateFacilityRequestDto.builder()
+                .name("Updated Inactive")
+                .address("Street 1")
+                .latitude(24.8)
+                .longitude(67.0)
+                .build();
+
+        assertThrows(IllegalStateException.class, () ->
+                verificationWorkflowService.submitFacilityUpdate(testFacility.getId(), updateDto, providerUser.getEmail()));
+    }
+
+    @Test
+    @DisplayName("Cannot submit update when a request is already pending (IllegalStateException)")
+    void testSubmitFacilityUpdate_AlreadyPendingRequest_ThrowsException() {
+        when(facilityRepository.findById(testFacility.getId())).thenReturn(Optional.of(testFacility));
+        when(userRepository.findByEmail(providerUser.getEmail())).thenReturn(Optional.of(providerUser));
+        when(verificationRequestRepository.findByFacilityIdAndStatus(testFacility.getId(), "PENDING"))
+                .thenReturn(List.of(pendingRequest));
+
+        UpdateFacilityRequestDto updateDto = UpdateFacilityRequestDto.builder()
+                .name("Updated Twice")
+                .address("Street 1")
+                .latitude(24.8)
+                .longitude(67.0)
+                .build();
+
+        assertThrows(IllegalStateException.class, () ->
+                verificationWorkflowService.submitFacilityUpdate(testFacility.getId(), updateDto, providerUser.getEmail()));
+    }
+
+    @Test
+    @DisplayName("Admin approval of UPDATE request applies staged changes, clears hasPendingUpdate, and reverifies facility")
+    void testProcessDecision_ApproveUpdate_AppliesStagedChanges() {
+        testFacility.setHasPendingUpdate(true);
+        testFacility.setVerified(false);
+
+        VerificationRequest updateRequest = VerificationRequest.builder()
+                .id(UUID.randomUUID())
+                .facility(testFacility)
+                .submittedBy(providerUser)
+                .status("PENDING")
+                .requestType("UPDATE")
+                .proposedChanges("{\"name\":\"Karachi Super Trauma Care\",\"address\":\"Main University Road\",\"city\":\"Karachi\",\"latitude\":24.9100,\"longitude\":67.0900,\"phoneNumber\":\"021-34900000\"}")
+                .submittedAt(Instant.now())
+                .build();
+
+        when(verificationRequestRepository.findById(updateRequest.getId())).thenReturn(Optional.of(updateRequest));
+        when(userRepository.findByEmail(adminUser.getEmail())).thenReturn(Optional.of(adminUser));
+        when(facilityRepository.save(any(Facility.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(verificationRequestRepository.save(any(VerificationRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        VerificationDecisionRequestDto decisionDto = VerificationDecisionRequestDto.builder()
+                .decision("APPROVED")
+                .reviewNotes("Changes verified and approved")
+                .build();
+
+        VerificationRequestResponseDto response = verificationWorkflowService.processDecision(
+                updateRequest.getId(), decisionDto, adminUser.getEmail());
+
+        assertNotNull(response);
+        assertEquals("APPROVED", response.getStatus());
+
+        // Verify that live facility was updated
+        assertEquals("Karachi Super Trauma Care", testFacility.getName());
+        assertEquals("Main University Road", testFacility.getAddress());
+        assertEquals(24.9100, testFacility.getLatitude(), 0.0001);
+        assertEquals(67.0900, testFacility.getLongitude(), 0.0001);
+        assertTrue(testFacility.isVerified(), "Facility should be re-verified upon approved update");
+        assertFalse(testFacility.isHasPendingUpdate(), "hasPendingUpdate should be cleared upon approval");
+    }
+
+    @Test
+    @DisplayName("Admin rejection of UPDATE request discards staged changes and clears hasPendingUpdate")
+    void testProcessDecision_RejectUpdate_DiscardsStagedChanges() {
+        testFacility.setHasPendingUpdate(true);
+        testFacility.setVerified(true); // Was previously verified
+
+        VerificationRequest updateRequest = VerificationRequest.builder()
+                .id(UUID.randomUUID())
+                .facility(testFacility)
+                .submittedBy(providerUser)
+                .status("PENDING")
+                .requestType("UPDATE")
+                .proposedChanges("{\"name\":\"Invalid Bogus Name\",\"address\":\"Invalid Address\",\"latitude\":24.9100,\"longitude\":67.0900}")
+                .submittedAt(Instant.now())
+                .build();
+
+        when(verificationRequestRepository.findById(updateRequest.getId())).thenReturn(Optional.of(updateRequest));
+        when(userRepository.findByEmail(adminUser.getEmail())).thenReturn(Optional.of(adminUser));
+        when(facilityRepository.save(any(Facility.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(verificationRequestRepository.save(any(VerificationRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        VerificationDecisionRequestDto decisionDto = VerificationDecisionRequestDto.builder()
+                .decision("REJECTED")
+                .reviewNotes("Changes contain fake address")
+                .build();
+
+        VerificationRequestResponseDto response = verificationWorkflowService.processDecision(
+                updateRequest.getId(), decisionDto, adminUser.getEmail());
+
+        assertNotNull(response);
+        assertEquals("REJECTED", response.getStatus());
+
+        // Live entity values must NOT be changed to the proposed bogus values
+        assertEquals("Karachi Trauma Care", testFacility.getName());
+        assertFalse(testFacility.isHasPendingUpdate(), "hasPendingUpdate must be cleared on rejection");
+    }
+
+    @Test
+    @DisplayName("VerificationRequestResponseDto reflects facilityActive, facilityDeletedAt, and facilityHasPendingUpdate")
+    void testGetVerificationRequestById_IncludesFacilityLifecycleStatus() {
+        testFacility.setActive(false);
+        testFacility.setDeletedAt(Instant.now());
+        testFacility.setHasPendingUpdate(true);
+
+        when(verificationRequestRepository.findById(pendingRequest.getId())).thenReturn(Optional.of(pendingRequest));
+
+        VerificationRequestResponseDto dto = verificationWorkflowService.getVerificationRequestById(pendingRequest.getId());
+
+        assertNotNull(dto);
+        assertEquals(false, dto.getFacilityActive());
+        assertNotNull(dto.getFacilityDeletedAt());
+        assertEquals(true, dto.getFacilityHasPendingUpdate());
     }
 }
