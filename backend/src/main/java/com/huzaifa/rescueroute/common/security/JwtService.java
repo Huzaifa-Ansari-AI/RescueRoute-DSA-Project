@@ -52,25 +52,25 @@ public class JwtService {
     }
 
     public String extractEmail(String token) {
-        return extractClaim(token, Claims::getSubject);
+        return extractClaim(token, claims -> claims != null ? claims.getSubject() : null);
     }
 
     public String extractRole(String token) {
-        return extractClaim(token, claims -> claims.get("role", String.class));
+        return extractClaim(token, claims -> claims != null ? claims.get("role", String.class) : null);
     }
 
     public UUID extractUserId(String token) {
-        String idStr = extractClaim(token, claims -> claims.get("userId", String.class));
+        String idStr = extractClaim(token, claims -> claims != null ? claims.get("userId", String.class) : null);
         return idStr != null ? UUID.fromString(idStr) : null;
     }
 
     public Date extractExpiration(String token) {
-        return extractClaim(token, Claims::getExpiration);
+        return extractClaim(token, claims -> claims != null ? claims.getExpiration() : null);
     }
 
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = extractAllClaims(token);
-        return claimsResolver.apply(claims);
+        return claims != null ? claimsResolver.apply(claims) : null;
     }
 
     public Claims extractAllClaims(String token) {
@@ -83,7 +83,8 @@ public class JwtService {
 
     public boolean isTokenExpired(String token) {
         try {
-            return extractExpiration(token).before(new Date());
+            Date expiration = extractExpiration(token);
+            return expiration == null || expiration.before(new Date());
         } catch (ExpiredJwtException e) {
             return true;
         } catch (JwtException | IllegalArgumentException e) {

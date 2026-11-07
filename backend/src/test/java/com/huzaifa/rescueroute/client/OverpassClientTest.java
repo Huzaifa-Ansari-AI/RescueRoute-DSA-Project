@@ -291,4 +291,90 @@ public class OverpassClientTest {
         assertThrows(IllegalArgumentException.class, () ->
                 overpassClient.queryMedicalFacilities(null, 67.0, 1000.0, null));
     }
+
+    @Test
+    @DisplayName("Category filtering: should build query for specific categories correctly")
+    void shouldBuildQueryForSpecificCategories() {
+        String hospitalQuery = overpassClient.buildOverpassQuery(24.86, 67.00, 1000.0, "Hospital");
+        assertTrue(hospitalQuery.contains("amenity\"=\"hospital"));
+        assertFalse(hospitalQuery.contains("emergency\"=\"ambulance_station"));
+
+        String pharmacyQuery = overpassClient.buildOverpassQuery(24.86, 67.00, 1000.0, "Pharmacy");
+        assertTrue(pharmacyQuery.contains("amenity\"=\"pharmacy"));
+        assertFalse(pharmacyQuery.contains("amenity\"=\"hospital"));
+
+        String ambulanceQuery = overpassClient.buildOverpassQuery(24.86, 67.00, 1000.0, "Ambulance");
+        assertTrue(ambulanceQuery.contains("emergency\"=\"ambulance_station"));
+        assertFalse(ambulanceQuery.contains("amenity\"=\"clinic"));
+
+        String clinicQuery = overpassClient.buildOverpassQuery(24.86, 67.00, 1000.0, "Clinic");
+        assertTrue(clinicQuery.contains("amenity\"=\"clinic"));
+        assertFalse(clinicQuery.contains("amenity\"=\"blood_donation"));
+
+        String bloodBankQuery = overpassClient.buildOverpassQuery(24.86, 67.00, 1000.0, "Blood Bank");
+        assertTrue(bloodBankQuery.contains("amenity\"=\"blood_donation"));
+        assertFalse(bloodBankQuery.contains("amenity\"=\"hospital"));
+    }
+
+    @Test
+    @DisplayName("Category null-safety: null, blank, ALL, and unsupported categories")
+    void shouldHandleNullAndUnsupportedCategoriesSafely() {
+        // null category -> queries all
+        String nullQuery = overpassClient.buildOverpassQuery(24.86, 67.00, 1000.0, null);
+        assertTrue(nullQuery.contains("amenity\"=\"hospital"));
+        assertTrue(nullQuery.contains("emergency\"=\"ambulance_station"));
+
+        // blank category -> queries all
+        String blankQuery = overpassClient.buildOverpassQuery(24.86, 67.00, 1000.0, "   ");
+        assertTrue(blankQuery.contains("amenity\"=\"hospital"));
+        assertTrue(blankQuery.contains("emergency\"=\"ambulance_station"));
+
+        // ALL category -> queries all
+        String allQuery = overpassClient.buildOverpassQuery(24.86, 67.00, 1000.0, "ALL");
+        assertTrue(allQuery.contains("amenity\"=\"hospital"));
+        assertTrue(allQuery.contains("emergency\"=\"ambulance_station"));
+
+        // Unsupported category -> query contains no medical clauses (only outer wrapper)
+        String unsupportedQuery = overpassClient.buildOverpassQuery(24.86, 67.00, 1000.0, "Gymnasium");
+        assertFalse(unsupportedQuery.contains("amenity\"=\"hospital"));
+        assertFalse(unsupportedQuery.contains("emergency\"=\"ambulance_station"));
+    }
+
+    @Test
+    @DisplayName("Response parsing with category filtering and null-safety")
+    void shouldFilterResponseByCategorySafely() {
+        String mockJson = """
+        {
+          "elements": [
+            {
+              "type": "node",
+              "id": 101,
+              "lat": 24.86,
+              "lon": 67.00,
+              "tags": { "name": "Hospital A", "amenity": "hospital" }
+            },
+            {
+              "type": "node",
+              "id": 102,
+              "lat": 24.87,
+              "lon": 67.01,
+              "tags": { "name": "Pharmacy B", "amenity": "pharmacy" }
+            }
+          ]
+        }
+        """;
+
+        // null category returns all
+        List<OsmElement> all = overpassClient.parseOverpassResponse(mockJson, null);
+        assertEquals(2, all.size());
+
+        // specific category returns only matching
+        List<OsmElement> hospitalsOnly = overpassClient.parseOverpassResponse(mockJson, "Hospital");
+        assertEquals(1, hospitalsOnly.size());
+        assertEquals("Hospital A", hospitalsOnly.get(0).getName());
+
+        // unsupported category returns empty list safely
+        List<OsmElement> none = overpassClient.parseOverpassResponse(mockJson, "NonExistentCategory");
+        assertTrue(none.isEmpty());
+    }
 }

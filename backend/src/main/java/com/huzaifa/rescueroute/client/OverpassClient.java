@@ -115,14 +115,15 @@ public class OverpassClient {
 
         String rLatLon = String.format(Locale.US, "(around:%.1f,%.6f,%.6f)", radiusMeters, lat, lng);
 
-        boolean queryAll = (targetCategory == null || targetCategory.isBlank() || targetCategory.equalsIgnoreCase("ALL"));
+        String normalizedCategory = (targetCategory == null || targetCategory.isBlank()) ? "ALL" : targetCategory.trim();
+        boolean queryAll = "ALL".equalsIgnoreCase(normalizedCategory);
 
-        if (queryAll || targetCategory.equalsIgnoreCase("Hospital")) {
+        if (queryAll || "Hospital".equalsIgnoreCase(normalizedCategory)) {
             sb.append("  nwr[\"amenity\"=\"hospital\"]").append(rLatLon).append(";\n");
             sb.append("  nwr[\"healthcare\"=\"hospital\"]").append(rLatLon).append(";\n");
         }
 
-        if (queryAll || targetCategory.equalsIgnoreCase("Clinic")) {
+        if (queryAll || "Clinic".equalsIgnoreCase(normalizedCategory)) {
             sb.append("  nwr[\"amenity\"=\"clinic\"]").append(rLatLon).append(";\n");
             sb.append("  nwr[\"amenity\"=\"doctors\"]").append(rLatLon).append(";\n");
             sb.append("  nwr[\"amenity\"=\"dentist\"]").append(rLatLon).append(";\n");
@@ -131,17 +132,17 @@ public class OverpassClient {
             sb.append("  nwr[\"healthcare\"=\"dentist\"]").append(rLatLon).append(";\n");
         }
 
-        if (queryAll || targetCategory.equalsIgnoreCase("Pharmacy")) {
+        if (queryAll || "Pharmacy".equalsIgnoreCase(normalizedCategory)) {
             sb.append("  nwr[\"amenity\"=\"pharmacy\"]").append(rLatLon).append(";\n");
             sb.append("  nwr[\"healthcare\"=\"pharmacy\"]").append(rLatLon).append(";\n");
         }
 
-        if (queryAll || targetCategory.equalsIgnoreCase("Blood Bank")) {
+        if (queryAll || "Blood Bank".equalsIgnoreCase(normalizedCategory)) {
             sb.append("  nwr[\"amenity\"=\"blood_donation\"]").append(rLatLon).append(";\n");
             sb.append("  nwr[\"healthcare\"=\"blood_bank\"]").append(rLatLon).append(";\n");
         }
 
-        if (queryAll || targetCategory.equalsIgnoreCase("Ambulance")) {
+        if (queryAll || "Ambulance".equalsIgnoreCase(normalizedCategory)) {
             sb.append("  nwr[\"emergency\"=\"ambulance_station\"]").append(rLatLon).append(";\n");
         }
 
@@ -280,11 +281,13 @@ public class OverpassClient {
             return results;
         }
 
+        String normalizedCategory = (targetCategory == null || targetCategory.isBlank()) ? "ALL" : targetCategory.trim();
+        boolean queryAll = "ALL".equalsIgnoreCase(normalizedCategory);
+
         for (JsonNode element : elementsNode) {
             OsmElement parsed = parseElement(element);
             if (parsed != null) {
-                if (targetCategory == null || targetCategory.isBlank() || targetCategory.equalsIgnoreCase("ALL")
-                        || parsed.getFacilityType().equalsIgnoreCase(targetCategory)) {
+                if (queryAll || normalizedCategory.equalsIgnoreCase(parsed.getFacilityType())) {
                     results.add(parsed);
                 }
             }

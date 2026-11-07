@@ -1,6 +1,5 @@
 package com.huzaifa.rescueroute.controller;
 
-import com.huzaifa.rescueroute.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,9 +33,6 @@ public class AuthControllerIntegrationTest {
 
     @Autowired
     private DataSource dataSource;
-
-    @Autowired
-    private UserRepository userRepository;
 
     @BeforeEach
     void setUp() {

@@ -80,6 +80,8 @@ public class DatabaseSeedAndRepositoryTest {
         // 4. Verify Blood Banks
         List<Facility> bloodBanks = facilityRepository.findByFacilityType("Blood Bank");
         assertEquals(2, bloodBanks.size(), "Should have 2 blood banks");
+        List<BloodBank> bloodBankEntities = bloodBankRepository.findAll();
+        assertFalse(bloodBankEntities.isEmpty(), "Should have blood bank entities");
 
         // 5. Verify Pharmacies
         List<Facility> pharmacies = facilityRepository.findByFacilityType("Pharmacy");

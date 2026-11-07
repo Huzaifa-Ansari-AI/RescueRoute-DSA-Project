@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.mockito.ArgumentMatchers;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -99,7 +100,7 @@ public class FacilityServiceTest {
                 .isActive(true)
                 .build();
 
-        when(facilityRepository.findAll(any(Specification.class))).thenReturn(List.of(facility));
+        when(facilityRepository.findAll(ArgumentMatchers.<Specification<Facility>>any())).thenReturn(List.of(facility));
 
         List<FacilityResponseDto> result = facilityService.getAllFacilities(null, null, null);
 
@@ -109,7 +110,7 @@ public class FacilityServiceTest {
         assertEquals("Hospital", result.get(0).getFacilityType());
         assertTrue(result.get(0).isVerified());
         assertTrue(result.get(0).isActive());
-        verify(facilityRepository, times(1)).findAll(any(Specification.class));
+        verify(facilityRepository, times(1)).findAll(ArgumentMatchers.<Specification<Facility>>any());
     }
 
     @Test
@@ -127,14 +128,14 @@ public class FacilityServiceTest {
                 .isActive(true)
                 .build();
 
-        when(facilityRepository.findAll(any(Specification.class))).thenReturn(List.of(facility));
+        when(facilityRepository.findAll(ArgumentMatchers.<Specification<Facility>>any())).thenReturn(List.of(facility));
 
         List<FacilityResponseDto> result = facilityService.getAllFacilities("Hospital", null, null);
 
         assertNotNull(result);
         assertEquals(1, result.size());
         assertEquals("Indus Hospital", result.get(0).getName());
-        verify(facilityRepository, times(1)).findAll(any(Specification.class));
+        verify(facilityRepository, times(1)).findAll(ArgumentMatchers.<Specification<Facility>>any());
     }
 
     @Test
@@ -151,14 +152,14 @@ public class FacilityServiceTest {
                 .isActive(true)
                 .build();
 
-        when(facilityRepository.findAll(any(Specification.class))).thenReturn(List.of(facility));
+        when(facilityRepository.findAll(ArgumentMatchers.<Specification<Facility>>any())).thenReturn(List.of(facility));
 
         List<FacilityResponseDto> result = facilityService.getAllFacilities(null, "Karachi", null);
 
         assertNotNull(result);
         assertEquals(1, result.size());
         assertEquals("Karachi", result.get(0).getCity());
-        verify(facilityRepository, times(1)).findAll(any(Specification.class));
+        verify(facilityRepository, times(1)).findAll(ArgumentMatchers.<Specification<Facility>>any());
     }
 
     @Test
@@ -175,26 +176,26 @@ public class FacilityServiceTest {
                 .isActive(true)
                 .build();
 
-        when(facilityRepository.findAll(any(Specification.class))).thenReturn(List.of(facility));
+        when(facilityRepository.findAll(ArgumentMatchers.<Specification<Facility>>any())).thenReturn(List.of(facility));
 
         List<FacilityResponseDto> result = facilityService.getAllFacilities(null, null, true);
 
         assertNotNull(result);
         assertEquals(1, result.size());
         assertTrue(result.get(0).isActive());
-        verify(facilityRepository, times(1)).findAll(any(Specification.class));
+        verify(facilityRepository, times(1)).findAll(ArgumentMatchers.<Specification<Facility>>any());
     }
 
     @Test
     @DisplayName("Filter facilities by combined criteria (type, city, active)")
     void testGetAllFacilities_CombinedFilters() {
-        when(facilityRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
+        when(facilityRepository.findAll(ArgumentMatchers.<Specification<Facility>>any())).thenReturn(Collections.emptyList());
 
         List<FacilityResponseDto> result = facilityService.getAllFacilities("Ambulance", "Karachi", true);
 
         assertNotNull(result);
         assertTrue(result.isEmpty());
-        verify(facilityRepository, times(1)).findAll(any(Specification.class));
+        verify(facilityRepository, times(1)).findAll(ArgumentMatchers.<Specification<Facility>>any());
     }
 
     @Test
@@ -493,7 +494,7 @@ public class FacilityServiceTest {
                 .isVerified(true)
                 .build();
 
-        when(facilityRepository.findAll(any(Specification.class))).thenReturn(List.of(f1, f2));
+        when(facilityRepository.findAll(ArgumentMatchers.<Specification<Facility>>any())).thenReturn(List.of(f1, f2));
 
         List<FacilityResponseDto> result = facilityService.getAdminFacilities("Hospital", "Karachi", null, true);
 

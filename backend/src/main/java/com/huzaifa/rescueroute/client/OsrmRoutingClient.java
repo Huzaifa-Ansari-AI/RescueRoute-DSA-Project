@@ -259,14 +259,6 @@ public class OsrmRoutingClient {
         }
     }
 
-    private String generateCacheKey(Double userLat, Double userLng, List<Facility> candidates) {
-        String coordsPart = String.format(Locale.US, "%.3f,%.3f", userLat, userLng);
-        String idsPart = candidates.stream()
-                .map(f -> f.getId() != null ? f.getId().toString().substring(0, 8) : "null")
-                .collect(Collectors.joining(","));
-        return coordsPart + ":" + idsPart;
-    }
-
     private String generateTargetsCacheKey(Double userLat, Double userLng, List<CoordinateTarget> targets) {
         String coordsPart = String.format(Locale.US, "%.3f,%.3f", userLat, userLng);
         String idsPart = targets.stream()
@@ -278,7 +270,6 @@ public class OsrmRoutingClient {
     private void storeInCache(String key, List<RoadMetric> metrics) {
         if (cache.size() >= MAX_CACHE_ENTRIES) {
             // Evict expired entries or clear if full
-            long now = System.currentTimeMillis();
             cache.entrySet().removeIf(entry -> entry.getValue().isExpired(cacheTtlMs));
             if (cache.size() >= MAX_CACHE_ENTRIES) {
                 cache.clear();

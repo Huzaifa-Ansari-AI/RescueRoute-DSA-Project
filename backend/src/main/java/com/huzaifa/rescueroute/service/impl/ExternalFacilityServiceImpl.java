@@ -24,7 +24,8 @@ import java.util.stream.Collectors;
 
 /**
  * Implementation of ExternalFacilityService handling Overpass querying,
- * data normalization, multi-level duplicate candidate detection, and idempotent persistence.
+ * data normalization, multi-level duplicate candidate detection, and idempotent
+ * persistence.
  */
 @Service
 public class ExternalFacilityServiceImpl implements ExternalFacilityService {
@@ -57,7 +58,8 @@ public class ExternalFacilityServiceImpl implements ExternalFacilityService {
         }
 
         HaversineUtil.validateCoordinate(request.getLatitude(), request.getLongitude(), "Import center");
-        if (request.getRadiusMeters() == null || request.getRadiusMeters() < 100.0 || request.getRadiusMeters() > 10000.0) {
+        if (request.getRadiusMeters() == null || request.getRadiusMeters() < 100.0
+                || request.getRadiusMeters() > 10000.0) {
             throw new IllegalArgumentException("Radius must be between 100 and 10,000 meters.");
         }
 
@@ -68,8 +70,7 @@ public class ExternalFacilityServiceImpl implements ExternalFacilityService {
                 request.getLatitude(),
                 request.getLongitude(),
                 request.getRadiusMeters(),
-                request.getFacilityType()
-        );
+                request.getFacilityType());
 
         if (elements == null || elements.isEmpty()) {
             return ExternalImportSummaryDto.builder()
@@ -96,7 +97,8 @@ public class ExternalFacilityServiceImpl implements ExternalFacilityService {
             try {
                 // Check Level 1: Exact source identity
                 Optional<ExternalFacility> existingOpt = externalFacilityRepository
-                        .findBySourceAndOsmElementTypeAndOsmElementId("OPENSTREETMAP", elem.getElementType(), elem.getElementId());
+                        .findBySourceAndOsmElementTypeAndOsmElementId("OPENSTREETMAP", elem.getElementType(),
+                                elem.getElementId());
 
                 // Check Level 2: Potential match against internal facilities
                 Optional<Facility> potentialDuplicate = duplicateDetector.findPotentialDuplicate(
@@ -104,11 +106,10 @@ public class ExternalFacilityServiceImpl implements ExternalFacilityService {
                         elem.getLongitude(),
                         elem.getName(),
                         elem.getFacilityType(),
-                        internalFacilities
-                );
+                        internalFacilities);
 
                 boolean isDuplicateCandidate = potentialDuplicate.isPresent();
-                UUID matchedFacilityId = potentialDuplicate.map(Facility::getId).orElse(null);
+                UUID matchedFacilityId = potentialDuplicate.map(f -> f.getId()).orElse(null);
 
                 if (existingOpt.isPresent()) {
                     // Idempotent update of existing external POI
@@ -126,7 +127,8 @@ public class ExternalFacilityServiceImpl implements ExternalFacilityService {
                     existing.setOsmTags(elem.getRawTagsJson());
                     existing.setLastSeenAt(Instant.now());
 
-                    // Preserve status if already reviewed or suppressed by admin; otherwise update candidate status
+                    // Preserve status if already reviewed or suppressed by admin; otherwise update
+                    // candidate status
                     if (!"REVIEWED".equalsIgnoreCase(existing.getImportStatus())
                             && !"SUPPRESSED".equalsIgnoreCase(existing.getImportStatus())) {
                         existing.setImportStatus(isDuplicateCandidate ? "DUPLICATE_CANDIDATE" : "DISCOVERED");
@@ -135,7 +137,8 @@ public class ExternalFacilityServiceImpl implements ExternalFacilityService {
 
                     externalFacilityRepository.save(existing);
                     updatedCount++;
-                    if (isDuplicateCandidate) duplicateCount++;
+                    if (isDuplicateCandidate)
+                        duplicateCount++;
 
                 } else {
                     // New external POI insertion
@@ -162,7 +165,8 @@ public class ExternalFacilityServiceImpl implements ExternalFacilityService {
 
                     externalFacilityRepository.save(newFacility);
                     importedCount++;
-                    if (isDuplicateCandidate) duplicateCount++;
+                    if (isDuplicateCandidate)
+                        duplicateCount++;
                 }
             } catch (Exception e) {
                 log.error("[ExternalFacilityService] Error persisting OSM element {}/{}: {}",
@@ -172,7 +176,8 @@ public class ExternalFacilityServiceImpl implements ExternalFacilityService {
         }
 
         long executionTime = System.currentTimeMillis() - startTime;
-        log.info("[ExternalFacilityService] Import complete: {} queried, {} new, {} updated, {} duplicate candidates in {}ms",
+        log.info(
+                "[ExternalFacilityService] Import complete: {} queried, {} new, {} updated, {} duplicate candidates in {}ms",
                 elements.size(), importedCount, updatedCount, duplicateCount, executionTime);
 
         return ExternalImportSummaryDto.builder()
@@ -183,7 +188,8 @@ public class ExternalFacilityServiceImpl implements ExternalFacilityService {
                 .skipped(0)
                 .failed(failedCount)
                 .executionTimeMs(executionTime)
-                .message(String.format("Successfully processed %d facilities (%d imported, %d updated, %d duplicate candidates flagged).",
+                .message(String.format(
+                        "Successfully processed %d facilities (%d imported, %d updated, %d duplicate candidates flagged).",
                         elements.size(), importedCount, updatedCount, duplicateCount))
                 .build();
     }
@@ -214,12 +220,15 @@ public class ExternalFacilityServiceImpl implements ExternalFacilityService {
         double maxLon = Math.min(180.0, lng + lonDelta);
 
         List<ExternalFacility> candidates = externalFacilityRepository.findByLatitudeBetweenAndLongitudeBetween(
-                minLat, maxLat, minLon, maxLon
-        );
+                minLat, maxLat, minLon, maxLon);
 
         // Pre-fetch internal facility names to populate matchedFacilityName efficiently
-        Map<UUID, String> internalFacilityNameMap = facilityRepository.findAll().stream()
-                .collect(Collectors.toMap(Facility::getId, Facility::getName, (a, b) -> a));
+        Map<UUID, String> internalFacilityNameMap = new HashMap<>();
+        for (Facility f : facilityRepository.findAll()) {
+            if (f != null && f.getId() != null && f.getName() != null) {
+                internalFacilityNameMap.putIfAbsent(f.getId(), f.getName());
+            }
+        }
 
         List<ExternalFacilityResponseDto> results = new ArrayList<>();
 
@@ -231,7 +240,8 @@ public class ExternalFacilityServiceImpl implements ExternalFacilityService {
                 }
             }
 
-            // Filter by status if specified; exclude SUPPRESSED by default unless explicitly asked
+            // Filter by status if specified; exclude SUPPRESSED by default unless
+            // explicitly asked
             if (status != null && !status.isBlank() && !status.equalsIgnoreCase("ALL")) {
                 if (!facility.getImportStatus().equalsIgnoreCase(status)) {
                     continue;
@@ -242,7 +252,8 @@ public class ExternalFacilityServiceImpl implements ExternalFacilityService {
                 }
             }
 
-            double distanceKm = HaversineUtil.calculateDistance(lat, lng, facility.getLatitude(), facility.getLongitude());
+            double distanceKm = HaversineUtil.calculateDistance(lat, lng, facility.getLatitude(),
+                    facility.getLongitude());
             if (distanceKm <= radiusKm) {
                 ExternalFacilityResponseDto dto = mapToDto(facility, distanceKm, internalFacilityNameMap);
                 results.add(dto);
@@ -250,7 +261,9 @@ public class ExternalFacilityServiceImpl implements ExternalFacilityService {
         }
 
         // Sort by distance ascending
-        results.sort(Comparator.comparingDouble(ExternalFacilityResponseDto::getDistanceKm));
+        results.sort((d1, d2) -> Double.compare(
+                (d1 != null && d1.getDistanceKm() != null) ? d1.getDistanceKm() : Double.MAX_VALUE,
+                (d2 != null && d2.getDistanceKm() != null) ? d2.getDistanceKm() : Double.MAX_VALUE));
         return results;
     }
 
@@ -262,8 +275,8 @@ public class ExternalFacilityServiceImpl implements ExternalFacilityService {
 
         Map<UUID, String> internalFacilityNameMap = facility.getMatchedFacilityId() != null
                 ? facilityRepository.findById(facility.getMatchedFacilityId())
-                .map(f -> Map.of(f.getId(), f.getName()))
-                .orElse(Collections.emptyMap())
+                        .map(f -> Map.of(f.getId(), f.getName()))
+                        .orElse(Collections.emptyMap())
                 : Collections.emptyMap();
 
         return mapToDto(facility, null, internalFacilityNameMap);

@@ -20,6 +20,7 @@ import org.springframework.data.jpa.domain.Specification;
 import java.util.List;
 import java.util.UUID;
 
+import org.mockito.ArgumentMatchers;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -128,7 +129,7 @@ public class RankingServiceTest {
                 .build();
         jpmc.setHospital(Hospital.builder().facility(jpmc).emergencyAvailable(true).build());
 
-        when(facilityRepository.findAll(any(Specification.class)))
+        when(facilityRepository.findAll(ArgumentMatchers.<Specification<Facility>>any()))
                 .thenReturn(List.of(indus, jpmc));
 
         // Mock OSRM Table API batch response: JPMC duration 11 min, Indus duration 18 min
@@ -198,7 +199,7 @@ public class RankingServiceTest {
                 .build();
         farFacility.setHospital(Hospital.builder().facility(farFacility).emergencyAvailable(true).build());
 
-        when(facilityRepository.findAll(any(Specification.class)))
+        when(facilityRepository.findAll(ArgumentMatchers.<Specification<Facility>>any()))
                 .thenReturn(List.of(farFacility, nearFacility));
 
         // Mock OSRM failure (e.g. timeout)
@@ -253,7 +254,7 @@ public class RankingServiceTest {
                 .build();
         unreachable.setHospital(Hospital.builder().facility(unreachable).emergencyAvailable(true).build());
 
-        when(facilityRepository.findAll(any(Specification.class)))
+        when(facilityRepository.findAll(ArgumentMatchers.<Specification<Facility>>any()))
                 .thenReturn(List.of(unreachable, reachable));
 
         // Reachable has valid metrics; unreachable has routeAvailable = false

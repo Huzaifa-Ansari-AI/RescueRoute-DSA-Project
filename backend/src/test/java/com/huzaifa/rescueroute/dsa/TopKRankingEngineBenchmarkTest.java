@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 public class TopKRankingEngineBenchmarkTest {
 
-    private static final String[] FACILITY_TYPES = {"Hospital", "Clinic", "Pharmacy", "Blood Bank", "Ambulance"};
+    private static final String[] FACILITY_TYPES = { "Hospital", "Clinic", "Pharmacy", "Blood Bank", "Ambulance" };
 
     private List<RankedFacilityResponseDto> generateSyntheticCandidates(int n) {
         Random rand = new Random(42); // Deterministic seed for reproducible benchmarking
@@ -54,24 +54,32 @@ public class TopKRankingEngineBenchmarkTest {
     private void runBenchmarkFor(int n, int k) {
         List<RankedFacilityResponseDto> candidates = generateSyntheticCandidates(n);
 
-        // Warm up JIT compiler
-        for (int i = 0; i < 5; i++) {
-            TopKRankingEngine.getTopK(candidates.subList(0, Math.min(n, 500)), k);
+        // Warm up JIT compiler with 25 iterations
+        int warmupRuns = 25;
+        List<RankedFacilityResponseDto> warmupCandidates = candidates.subList(0, Math.min(n, 1000));
+        for (int i = 0; i < warmupRuns; i++) {
+            TopKRankingEngine.getTopK(warmupCandidates, k);
         }
 
-        System.gc();
-        long memBefore = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-        long startTime = System.nanoTime();
+        // Measure across multiple iterations for statistical stability
+        int measuredRuns = 9;
+        List<Double> elapsedMsList = new ArrayList<>(measuredRuns);
+        List<RankedFacilityResponseDto> topK = null;
 
-        List<RankedFacilityResponseDto> topK = TopKRankingEngine.getTopK(candidates, k);
+        for (int run = 0; run < measuredRuns; run++) {
+            long startTime = System.nanoTime();
+            topK = TopKRankingEngine.getTopK(candidates, k);
+            long endTime = System.nanoTime();
+            elapsedMsList.add((endTime - startTime) / 1_000_000.0);
+        }
 
-        long endTime = System.nanoTime();
-        long memAfter = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-
-        double elapsedMs = (endTime - startTime) / 1_000_000.0;
-        long approxAuxMem = Math.max(0, memAfter - memBefore);
+        elapsedMsList.sort(Double::compareTo);
+        double medianMs = elapsedMsList.get(measuredRuns / 2);
+        double p95Ms = elapsedMsList.get((int) Math.min(measuredRuns - 1, Math.ceil(0.95 * measuredRuns) - 1));
+        double minMs = elapsedMsList.get(0);
 
         // Correctness assertions
+        assertNotNull(topK, "Top-K results must not be null");
         assertEquals(k, topK.size(), "Top-K result size must match requested K");
 
         // Verify descending score monotonicity
@@ -80,18 +88,25 @@ public class TopKRankingEngineBenchmarkTest {
             RankedFacilityResponseDto curr = topK.get(i);
 
             assertTrue(prev.getScore() >= curr.getScore() ||
-                            (prev.getScore() == curr.getScore() && prev.getDistanceKm() <= curr.getDistanceKm()),
+                    (prev.getScore() == curr.getScore() && prev.getDistanceKm() <= curr.getDistanceKm()),
                     "Top-K results must be strictly ordered best-first");
             assertEquals(i + 1, curr.getRank(), "Sequential rank must be assigned");
         }
 
-        // Verify that rank 1 score is indeed the maximum in the dataset
-        double maxDatasetScore = candidates.stream().mapToDouble(RankedFacilityResponseDto::getScore).max().orElse(0.0);
+        // Verify that rank 1 score is indeed the maximum in the dataset (null-safe
+        // loop)
+        double maxDatasetScore = 0.0;
+        for (RankedFacilityResponseDto dto : candidates) {
+            if (dto != null && dto.getScore() > maxDatasetScore) {
+                maxDatasetScore = dto.getScore();
+            }
+        }
         assertEquals(maxDatasetScore, topK.get(0).getScore(), 0.001,
                 "Rank 1 facility must possess the maximum score in the dataset");
 
-        System.out.printf("[DSA BENCHMARK] N = %-7d | K = %-3d | Time: %7.3f ms | AuxMem: %6.2f KB | Status: PASS%n",
-                n, k, elapsedMs, approxAuxMem / 1024.0);
+        System.out.printf(
+                "[DSA BENCHMARK] N = %-7d | K = %-3d | Median: %6.3f ms | p95: %6.3f ms | Min: %6.3f ms | AuxSpace: O(K=%d) | Status: PASS%n",
+                n, k, medianMs, p95Ms, minMs, k);
     }
 
     @Test
@@ -121,4 +136,7 @@ public class TopKRankingEngineBenchmarkTest {
         runBenchmarkFor(100_000, 10);
         runBenchmarkFor(100_000, 20);
     }
+
 }
+
+    

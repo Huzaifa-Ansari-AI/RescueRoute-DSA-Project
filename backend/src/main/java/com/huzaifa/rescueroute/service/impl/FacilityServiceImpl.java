@@ -32,15 +32,16 @@ import java.util.stream.Collectors;
 public class FacilityServiceImpl implements FacilityService {
 
     private final FacilityRepository facilityRepository;
-    private final HospitalRepository hospitalRepository;
-    private final BloodBankRepository bloodBankRepository;
-    private final PharmacyRepository pharmacyRepository;
-    private final AmbulanceRepository ambulanceRepository;
-    private final ClinicRepository clinicRepository;
     private final FacilityMapper facilityMapper;
     private final UserRepository userRepository;
     private final VerificationRequestRepository verificationRequestRepository;
     private final AdminLogRepository adminLogRepository;
+
+    public FacilityServiceImpl(
+            FacilityRepository facilityRepository,
+            FacilityMapper facilityMapper) {
+        this(facilityRepository, facilityMapper, null, null, null);
+    }
 
     public FacilityServiceImpl(
             FacilityRepository facilityRepository,
@@ -50,12 +51,23 @@ public class FacilityServiceImpl implements FacilityService {
             AmbulanceRepository ambulanceRepository,
             ClinicRepository clinicRepository,
             FacilityMapper facilityMapper) {
-        this(facilityRepository, hospitalRepository, bloodBankRepository,
-             pharmacyRepository, ambulanceRepository, clinicRepository,
-             facilityMapper, null, null, null);
+        this(facilityRepository, facilityMapper, null, null, null);
     }
 
     @Autowired
+    public FacilityServiceImpl(
+            FacilityRepository facilityRepository,
+            FacilityMapper facilityMapper,
+            @Autowired(required = false) UserRepository userRepository,
+            @Autowired(required = false) VerificationRequestRepository verificationRequestRepository,
+            @Autowired(required = false) AdminLogRepository adminLogRepository) {
+        this.facilityRepository = facilityRepository;
+        this.facilityMapper = facilityMapper;
+        this.userRepository = userRepository;
+        this.verificationRequestRepository = verificationRequestRepository;
+        this.adminLogRepository = adminLogRepository;
+    }
+
     public FacilityServiceImpl(
             FacilityRepository facilityRepository,
             HospitalRepository hospitalRepository,
@@ -64,19 +76,10 @@ public class FacilityServiceImpl implements FacilityService {
             AmbulanceRepository ambulanceRepository,
             ClinicRepository clinicRepository,
             FacilityMapper facilityMapper,
-            @Autowired(required = false) UserRepository userRepository,
-            @Autowired(required = false) VerificationRequestRepository verificationRequestRepository,
-            @Autowired(required = false) AdminLogRepository adminLogRepository) {
-        this.facilityRepository = facilityRepository;
-        this.hospitalRepository = hospitalRepository;
-        this.bloodBankRepository = bloodBankRepository;
-        this.pharmacyRepository = pharmacyRepository;
-        this.ambulanceRepository = ambulanceRepository;
-        this.clinicRepository = clinicRepository;
-        this.facilityMapper = facilityMapper;
-        this.userRepository = userRepository;
-        this.verificationRequestRepository = verificationRequestRepository;
-        this.adminLogRepository = adminLogRepository;
+            UserRepository userRepository,
+            VerificationRequestRepository verificationRequestRepository,
+            AdminLogRepository adminLogRepository) {
+        this(facilityRepository, facilityMapper, userRepository, verificationRequestRepository, adminLogRepository);
     }
 
     @Override
